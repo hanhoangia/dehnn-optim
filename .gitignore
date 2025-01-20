@@ -1,0 +1,9 @@
+# Ignore the folder '.ipynb_checkpoints'
+.ipynb_checkpoints/'
+models/.ipynb_checkpoints/
+models/layers/.ipynb_checkpoints/
+
+# Ignore the folder '__pycache__'
+__pycache__/
+models/__pycache__/
+models/__pycache__/

@@ -1,0 +1,249 @@
+function,nc,tt,ct
+"('<frozen importlib._bootstrap>', 1017, '_handle_fromlist')",2,6.5000000000000004e-06,8.6e-06
+"('_collections_abc.py', 664, '__contains__')",8,7.2000000000000005e-06,1.4200000000000001e-05
+"('functools.py', 404, '__get__')",2,1.54e-05,1.72e-05
+"('__init__.py', 47, 'create_string_buffer')",2,0.0010979,0.0011
+"('_weakrefset.py', 16, '__init__')",4,7.4e-06,7.4e-06
+"('_weakrefset.py', 20, '__enter__')",4,1.45e-05,1.7800000000000002e-05
+"('_weakrefset.py', 26, '__exit__')",4,1.54e-05,2.2400000000000002e-05
+"('_weakrefset.py', 52, '_commit_removals')",4,5.2e-06,5.2e-06
+"('_weakrefset.py', 58, '__iter__')",6,2.92e-05,7.680000000000001e-05
+"('_weakrefset.py', 81, 'add')",2,8.6e-06,1.54e-05
+"('_weakrefset.py', 106, 'remove')",2,1.29e-05,3.9800000000000005e-05
+"('threading.py', 513, 'is_set')",2,1.2000000000000002e-06,1.2000000000000002e-06
+"('_compile.py', 9, 'is_compiling')",336,0.0004867,0.0004867
+"('_tensor.py', 429, 'backward')",3,5.7600000000000004e-05,36.7330826
+"('_tensor.py', 906, '__iter__')",4,2.4900000000000002e-05,0.00014130000000000002
+"('_tensor.py', 928, '__hash__')",246,6.96e-05,0.00013220000000000001
+"('__init__.py', 78, '_is_compiled')",3,4.1000000000000006e-06,8.200000000000001e-06
+"('__init__.py', 82, 'is_available')",3,1.13e-05,2.47e-05
+"('functional.py', 45, 'broadcast_tensors')",8,0.00011640000000000001,0.0002368
+"('__init__.py', 31, '__get__')",24,3.32e-05,6.63e-05
+"('module.py', 1188, '_call_impl')",432,0.4793182,25.1569639
+"('module.py', 1256, '__getattr__')",580,0.0019207,0.0019207
+"('linear.py', 113, 'forward')",152,0.0016018,4.1577568000000005
+"('functional.py', 1446, 'relu')",24,0.00016240000000000002,0.4352745
+"('functional.py', 1618, 'leaky_relu')",64,0.00044,4.3309612
+"('functional.py', 2500, 'layer_norm')",24,0.00046360000000000005,1.4219469
+"('functional.py', 3264, 'mse_loss')",8,0.0001144,0.009554700000000001
+"('_VF.py', 26, '__getattr__')",8,1.5300000000000003e-05,2.5300000000000002e-05
+"('_reduction.py', 7, 'get_enum')",8,1.04e-05,1.04e-05
+"('_jit_internal.py', 1082, 'is_scripting')",483,0.0001688,0.0001688
+"('activation.py', 101, 'forward')",24,0.0001515,0.43542600000000004
+"('~', 0, '<built-in method torch._C._get_tracing_state>')",436,0.0035534000000000004,0.0035534000000000004
+"('~', 0, '<built-in method torch._C._is_tracing>')",96,0.00046520000000000003,0.00046520000000000003
+"('~', 0, '<built-in method torch._C._get_cudnn_enabled>')",24,3.3100000000000005e-05,3.3100000000000005e-05
+"('~', 0, '<built-in method torch._C._has_torch_function>')",8,5.1e-06,5.1e-06
+"('~', 0, '<built-in method torch._C._has_torch_function_unary>')",91,0.000136,0.000136
+"('~', 0, '<built-in method torch._C._has_torch_function_variadic>')",32,4.39e-05,4.39e-05
+"('~', 0, '<built-in method torch._C._set_grad_enabled>')",6,2.9e-06,2.9e-06
+"('~', 0, '<built-in method torch.is_grad_enabled>')",9,5.3e-06,5.3e-06
+"('~', 0, '<built-in method torch._C._cuda_getDeviceCount>')",3,5.2e-06,5.2e-06
+"('~', 0, ""<method 'dim' of 'torch._C._TensorBase' objects>"")",428,0.0002771,0.0002771
+"('~', 0, ""<method 'item' of 'torch._C._TensorBase' objects>"")",254,0.0004965,0.0004965
+"('~', 0, ""<method 'numel' of 'torch._C._TensorBase' objects>"")",19,3.09e-05,3.09e-05
+"('~', 0, ""<method 'requires_grad_' of 'torch._C._TensorBase' objects>"")",246,0.00010240000000000001,0.00010240000000000001
+"('~', 0, ""<method 'size' of 'torch._C._TensorBase' objects>"")",300,0.0007671,0.0007671
+"('~', 0, ""<method 'to' of 'torch._C._TensorBase' objects>"")",120,0.0017257000000000002,0.0017257000000000002
+"('~', 0, ""<method 'add_' of 'torch._C._TensorBase' objects>"")",492,0.0036232,0.0036232
+"('~', 0, ""<method 'addcdiv_' of 'torch._C._TensorBase' objects>"")",246,0.0017556000000000002,0.0017556000000000002
+"('~', 0, ""<method 'addcmul_' of 'torch._C._TensorBase' objects>"")",246,0.0015576000000000001,0.0015576000000000001
+"('~', 0, ""<method 'clamp' of 'torch._C._TensorBase' objects>"")",8,0.0003087,0.0003087
+"('~', 0, ""<method 'expand_as' of 'torch._C._TensorBase' objects>"")",72,0.0010291,0.0010291
+"('~', 0, ""<method 'index_select' of 'torch._C._TensorBase' objects>"")",48,0.851906,0.851906
+"('~', 0, ""<method 'max' of 'torch._C._TensorBase' objects>"")",16,0.0047887,0.0047887
+"('~', 0, ""<method 'mul_' of 'torch._C._TensorBase' objects>"")",738,0.0073876,0.0073876
+"('~', 0, ""<method 'new_ones' of 'torch._C._TensorBase' objects>"")",8,0.0045263000000000005,0.0045263000000000005
+"('~', 0, ""<method 'new_zeros' of 'torch._C._TensorBase' objects>"")",72,0.6697730000000001,0.6697730000000001
+"('~', 0, ""<method 'scatter_add_' of 'torch._C._TensorBase' objects>"")",64,3.9207271,3.9207271
+"('~', 0, ""<method 'scatter_reduce_' of 'torch._C._TensorBase' objects>"")",8,0.9606048,0.9606048
+"('~', 0, ""<method 'sqrt' of 'torch._C._TensorBase' objects>"")",246,0.0013989,0.0013989
+"('~', 0, ""<method 'unbind' of 'torch._C._TensorBase' objects>"")",4,9.77e-05,9.77e-05
+"('~', 0, ""<method 'view' of 'torch._C._TensorBase' objects>"")",120,0.0035118000000000003,0.0035118000000000003
+"('~', 0, ""<method 'zero_' of 'torch._C._TensorBase' objects>"")",246,0.0003881,0.0003881
+"('~', 0, '<built-in method torch.concat>')",44,1.2653009000000002,1.2653009000000002
+"('~', 0, '<built-in method torch.rand>')",4,0.0888242,0.0888242
+"('~', 0, '<built-in method torch.zeros>')",6,0.0002321,0.0002321
+"('~', 0, '<built-in method torch.is_complex>')",246,0.0002034,0.0002034
+"('~', 0, '<built-in method torch.ones_like>')",3,5.08e-05,5.08e-05
+"('~', 0, '<built-in method torch.squeeze>')",8,0.00019580000000000002,0.00019580000000000002
+"('~', 0, '<built-in method torch.broadcast_tensors>')",8,9e-05,9e-05
+"('~', 0, '<built-in method torch.layer_norm>')",24,1.4213811,1.4213811
+"('~', 0, '<built-in method torch.relu>')",24,0.4350736,0.4350736
+"('~', 0, '<built-in method torch._C._are_functorch_transforms_active>')",3,1.4400000000000001e-05,1.4400000000000001e-05
+"('~', 0, '<built-in method torch._ops.profiler._record_function_exit>')",6,8.32e-05,8.32e-05
+"('~', 0, '<built-in method torch._ops.profiler._record_function_enter>')",6,0.00021580000000000001,0.00021580000000000001
+"('activation.py', 774, 'forward')",32,0.0001761,0.6606842
+"('loss.py', 535, 'forward')",8,4.9500000000000004e-05,0.0096042
+"('container.py', 194, '__iter__')",80,0.0003009,0.0004867
+"('container.py', 202, 'forward')",80,0.23558900000000002,4.0840316
+"('container.py', 268, '_get_abs_string_index')",56,0.0005569,0.0008207
+"('container.py', 277, '__getitem__')",56,0.0003081,0.0012534
+"('container.py', 298, '__len__')",112,6.85e-05,0.0001016
+"('__init__.py', 47, '_make_grads')",3,4.6500000000000005e-05,0.0001055
+"('__init__.py', 95, '_tensor_or_tensors_to_tuple')",3,5e-06,5e-06
+"('__init__.py', 103, 'backward')",3,6.0400000000000004e-05,36.7330228
+"('grad_mode.py', 24, 'decorate_context')",3,7.16e-05,0.026481900000000003
+"('grad_mode.py', 82, 'clone')",3,8.8e-06,4.0300000000000004e-05
+"('grad_mode.py', 126, '__init__')",3,3.0200000000000002e-05,3.15e-05
+"('grad_mode.py', 131, '__enter__')",3,2.02e-05,3.9200000000000004e-05
+"('grad_mode.py', 135, '__exit__')",3,1.48e-05,3.15e-05
+"('grad_mode.py', 227, '__init__')",6,2.75e-05,3.3e-05
+"('profiler.py', 478, '__init__')",6,5.7e-05,0.00028910000000000003
+"('profiler.py', 487, '__enter__')",6,7.43e-05,0.00030930000000000004
+"('profiler.py', 491, '__exit__')",6,3.3100000000000005e-05,0.0001261
+"('normalization.py', 189, 'forward')",24,0.00028240000000000003,1.4222670000000002
+"('optimizer.py', 98, '_cuda_graph_capture_health_check')",3,1.3000000000000001e-05,3.77e-05
+"('optimizer.py', 117, '_optimizer_step_code')",3,1.6000000000000001e-06,1.6000000000000001e-06
+"('optimizer.py', 135, 'wrapper')",3,9.82e-05,0.026952200000000003
+"('optimizer.py', 246, 'zero_grad')",3,0.0006897,0.0015588000000000002
+"('adamw.py', 107, 'step')",3,0.0010133,0.0262993
+"('adamw.py', 204, '<genexpr>')",249,9.300000000000001e-05,0.0001184
+"('adamw.py', 181, 'adamw')",3,2.61e-05,0.0249306
+"('adamw.py', 235, '_single_tensor_adamw')",3,0.0082711,0.0247412
+"('message_passing.py', 254, '_check_input')",48,0.0005725,0.0013477
+"('message_passing.py', 295, '_set_size')",96,0.0003823,0.0007417000000000001
+"('message_passing.py', 309, '_index_select')",48,0.0002746,0.8524468000000001
+"('message_passing.py', 315, '_index_select_safe')",48,0.0002436,0.8521496000000001
+"('message_passing.py', 608, 'aggregate')",48,0.0007953000000000001,4.215415200000001
+"('message_passing.py', 640, 'update')",48,1.73e-05,1.73e-05
+"('base.py', 98, '__call__')",48,0.000696,4.2130072
+"('base.py', 170, 'reduce')",48,0.00039450000000000005,4.2113921
+"('basic.py', 19, 'forward')",48,0.0001764,4.2115685
+"('_ops.py', 437, '__call__')",12,2.9e-05,0.000328
+"('_trace.py', 1017, 'is_tracing')",96,0.0002541,0.0007317000000000001
+"('_monitor.py', 94, 'report')",2,5.3e-06,6.5000000000000004e-06
+"('std.py', 102, 'acquire')",14,5.75e-05,0.0001201
+"('std.py', 106, 'release')",14,6.560000000000001e-05,9.580000000000001e-05
+"('std.py', 110, '__enter__')",8,1.16e-05,6.43e-05
+"('std.py', 113, '__exit__')",8,9.100000000000001e-06,5.14e-05
+"('std.py', 153, '__init__')",8,2.72e-05,3.5300000000000004e-05
+"('std.py', 163, 'colour')",8,3.4e-06,3.4e-06
+"('std.py', 167, 'colour')",8,8.1e-06,8.1e-06
+"('std.py', 186, '__format__')",8,4.9500000000000004e-05,5.8200000000000005e-05
+"('std.py', 226, '__init__')",6,2.4100000000000003e-05,2.4100000000000003e-05
+"('std.py', 231, '__call__')",23,4.5400000000000006e-05,4.5400000000000006e-05
+"('std.py', 400, 'format_interval')",14,9.7e-05,0.00011080000000000001
+"('std.py', 451, 'fp_write')",8,6.29e-05,0.0013160000000000001
+"('std.py', 457, 'print_status')",8,3.8e-05,0.0019213000000000001
+"('std.py', 438, 'status_printer')",2,1.6100000000000002e-05,2.72e-05
+"('std.py', 464, 'format_meter')",8,0.000431,0.0019886
+"('std.py', 663, '__new__')",2,3.2200000000000003e-05,0.00010510000000000001
+"('std.py', 682, '<setcomp>')",2,6.5000000000000004e-06,4.78e-05
+"('std.py', 679, '_get_free_pos')",2,3.4500000000000005e-05,8.89e-05
+"('std.py', 686, '_decr_instances')",2,5e-05,0.0001462
+"('std.py', 760, 'get_lock')",2,4.1000000000000006e-06,5.2e-06
+"('std.py', 952, '__init__')",2,0.0001027,0.0030004000000000003
+"('std.py', 1147, '__del__')",2,3.4e-06,4.7e-06
+"('std.py', 1150, '__str__')",8,6.75e-05,0.0021536000000000003
+"('std.py', 1153, '_comparable')",4,4.2000000000000004e-06,6.6e-06
+"('std.py', 1157, '__hash__')",4,4.4e-06,7.000000000000001e-06
+"('std.py', 1160, '__iter__')",6,4.8e-05,0.0038399000000000003
+"('std.py', 1198, 'update')",4,9.130000000000001e-05,0.0025247
+"('std.py', 1286, 'fp_write')",4,1.74e-05,0.00015810000000000002
+"('std.py', 1301, '<lambda>')",2,7.000000000000001e-07,7.000000000000001e-07
+"('std.py', 1265, 'close')",4,4.05e-05,0.0012636000000000001
+"('std.py', 1325, 'refresh')",6,6.15e-05,0.0034229000000000004
+"('std.py', 1446, 'format_dict')",8,7.99e-05,9.750000000000001e-05
+"('std.py', 1464, 'display')",8,5.0100000000000005e-05,0.0041336
+"('utils.py', 108, '__init__')",8,1.6100000000000002e-05,1.6100000000000002e-05
+"('utils.py', 112, '__format__')",8,7.100000000000001e-06,7.100000000000001e-06
+"('utils.py', 125, '__eq__')",2,5e-06,1.16e-05
+"('utils.py', 139, '__getattr__')",2,3.1000000000000004e-06,5e-06
+"('utils.py', 152, 'wrapper_setattr')",6,6.900000000000001e-06,6.900000000000001e-06
+"('utils.py', 156, '__init__')",2,3.4e-06,7.9e-06
+"('utils.py', 194, 'inner')",20,2.9800000000000003e-05,0.0013938000000000002
+"('utils.py', 187, 'disable_on_exception')",4,4.800000000000001e-06,7.5e-06
+"('utils.py', 213, '__init__')",2,1.87e-05,3.86e-05
+"('utils.py', 222, '__eq__')",8,6e-06,1e-05
+"('utils.py', 252, '_is_utf')",2,8.200000000000001e-06,1.23e-05
+"('utils.py', 266, '_supports_unicode')",2,1.2100000000000001e-05,2.9400000000000003e-05
+"('utils.py', 273, '_is_ascii')",16,0.00023640000000000003,0.0002635
+"('utils.py', 282, '_screen_shape_wrapper')",2,1.6000000000000001e-06,1.6000000000000001e-06
+"('utils.py', 297, '_screen_shape_windows')",2,0.0005108000000000001,0.0016301
+"('utils.py', 375, '<genexpr>')",2192,0.0007195000000000001,0.0010301000000000002
+"('utils.py', 374, '_text_width')",24,4.63e-05,0.0013977
+"('utils.py', 378, 'disp_len')",24,3.96e-05,0.0014811000000000002
+"('utils.py', 386, 'disp_trim')",8,2.4100000000000003e-05,0.0006213000000000001
+"('_scatter.py', 15, 'scatter')",64,0.0048874,5.5697825000000005
+"('_scatter.py', 177, 'broadcast')",72,0.0006634000000000001,0.0038373
+"('sparse.py', 114, 'is_torch_sparse_tensor')",144,0.00039190000000000004,0.00041150000000000003
+"('sparse.py', 132, 'is_sparse')",96,0.00013340000000000002,0.000517
+"('dropout.py', 157, 'dropout_edge')",4,0.07960020000000001,0.168573
+"('experimental.py', 18, 'get_options')",48,7.680000000000001e-05,0.00010790000000000001
+"('experimental.py', 34, '<listcomp>')",48,8.230000000000001e-05,8.230000000000001e-05
+"('experimental.py', 26, 'is_experimental_mode_enabled')",48,0.0003507,0.0011159
+"('experimental.py', 114, 'wrapper')",48,0.0002566,4.2143797
+"('storage.py', 82, '_pop_cache')",12,1.66e-05,8.070000000000001e-05
+"('storage.py', 89, '__getattr__')",72,0.000101,0.0001619
+"('storage.py', 100, '__setattr__')",12,3.61e-05,0.0001518
+"('storage.py', 117, '__getitem__')",88,6.97e-05,6.97e-05
+"('storage.py', 120, '__setitem__')",12,1.8e-05,9.87e-05
+"('storage.py', 206, 'get')",28,3.0500000000000003e-05,4.25e-05
+"('storage.py', 555, 'edge_index')",8,1.5100000000000001e-05,3.1100000000000004e-05
+"('hetero_data.py', 150, '__getattr__')",20,5.11e-05,0.0002452
+"('hetero_data.py', 162, '__setattr__')",12,3.72e-05,0.0002462
+"('hetero_data.py', 173, '__getitem__')",28,0.0001272,0.00032980000000000005
+"('hetero_data.py', 254, 'node_types')",20,3.4e-05,3.9800000000000005e-05
+"('hetero_data.py', 264, 'edge_types')",12,1.32e-05,1.5300000000000003e-05
+"('hetero_data.py', 486, '<listcomp>')",8,7.000000000000001e-06,7.000000000000001e-06
+"('hetero_data.py', 475, '_to_canonical')",28,6.88e-05,0.000114
+"('hetero_data.py', 571, 'get_node_store')",8,7.4e-06,8.900000000000001e-06
+"('hetero_data.py', 590, 'get_edge_store')",20,1.9e-05,3.2000000000000005e-05
+"('simple_conv.py', 64, 'forward')",48,0.6707829000000001,7.271956800000001
+"('simple_conv.py', 95, 'message')",48,0.8309227,0.8323355
+"('glob.py', 37, 'global_mean_pool')",8,0.00011080000000000001,0.39491590000000004
+"('glob.py', 66, 'global_max_pool')",8,0.0001022,0.9641212
+"('model_att.py', 149, 'forward')",4,0.8058715000000001,25.1242331
+"('dehnn_layers.py', 49, 'forward')",12,3.2071745000000003,13.941270200000002
+"('<string>', 1, '__new__')",48,9.22e-05,0.0001818
+"('torch_geometric.nn.conv.simple_conv_SimpleConv_propagate_4k6cvm68.py', 109, 'propagate')",48,0.6950754,6.6009850000000005
+"('torch_geometric.nn.conv.simple_conv_SimpleConv_propagate_4k6cvm68.py', 33, 'collect')",48,0.0023096,0.8558354
+"('~', 0, '<built-in method torch._C._nn.leaky_relu>')",64,4.3304259,4.3304259
+"('~', 0, '<built-in method torch._C._nn.linear>')",152,4.1556523,4.1556523
+"('~', 0, '<built-in method torch._C._nn.mse_loss>')",8,0.009150700000000001,0.009150700000000001
+"('~', 0, ""<method 'run_backward' of 'torch._C._EngineBase' objects>"")",3,36.7328246,36.7328246
+"('~', 0, ""<method 'disable' of '_lsprof.Profiler' objects>"")",1,6.000000000000001e-07,6.000000000000001e-07
+"('~', 0, ""<method 'sub' of 're.Pattern' objects>"")",24,4.38e-05,4.38e-05
+"('~', 0, '<built-in method _struct.unpack>')",2,7.000000000000001e-06,7.000000000000001e-06
+"('~', 0, '<built-in method _weakref.proxy>')",4,2.7e-06,2.7e-06
+"('~', 0, '<built-in method now>')",6,2.3e-05,2.3e-05
+"('~', 0, '<built-in method fromtimestamp>')",2,1e-05,1e-05
+"('~', 0, '<built-in method math.sqrt>')",246,8.16e-05,8.16e-05
+"('~', 0, '<built-in method _operator.index>')",56,4.05e-05,4.05e-05
+"('~', 0, ""<method 'acquire' of '_thread.RLock' objects>"")",14,1.3700000000000001e-05,1.3700000000000001e-05
+"('~', 0, ""<method 'release' of '_thread.RLock' objects>"")",14,6.200000000000001e-06,6.200000000000001e-06
+"('~', 0, '<built-in method time.time>')",20,1.02e-05,1.02e-05
+"('~', 0, ""<method 'write' of '_io.TextIOWrapper' objects>"")",12,0.0013364000000000002,0.0013364000000000002
+"('~', 0, ""<method 'flush' of '_io.TextIOWrapper' objects>"")",12,3.3600000000000004e-05,3.3600000000000004e-05
+"('~', 0, ""<method 'get' of 'dict' objects>"")",59,2.86e-05,2.86e-05
+"('~', 0, ""<method 'keys' of 'dict' objects>"")",32,7.9e-06,7.9e-06
+"('~', 0, ""<method 'values' of 'dict' objects>"")",12,3e-06,3e-06
+"('~', 0, ""<method 'update' of 'dict' objects>"")",8,9.800000000000001e-06,9.800000000000001e-06
+"('~', 0, ""<method 'append' of 'list' objects>"")",1233,0.0001594,0.0001594
+"('~', 0, ""<method 'values' of 'collections.OrderedDict' objects>"")",368,0.0003256,0.0003256
+"('~', 0, ""<method 'add' of 'set' objects>"")",6,6.900000000000001e-06,1.01e-05
+"('~', 0, ""<method 'difference' of 'set' objects>"")",2,3e-06,3e-06
+"('~', 0, ""<method 'remove' of 'set' objects>"")",6,1.3300000000000001e-05,2.8700000000000003e-05
+"('~', 0, ""<method 'encode' of 'str' objects>"")",2,4.1000000000000006e-06,4.1000000000000006e-06
+"('~', 0, ""<method 'format' of 'str' objects>"")",19,8.560000000000001e-05,0.0001509
+"('~', 0, '<built-in method builtins.abs>')",12,6e-06,6e-06
+"('~', 0, '<built-in method builtins.all>')",51,7.53e-05,0.00019370000000000002
+"('~', 0, '<built-in method builtins.divmod>')",36,1.63e-05,1.63e-05
+"('~', 0, '<built-in method builtins.getattr>')",76,0.00010240000000000001,0.0001594
+"('~', 0, '<built-in method builtins.hasattr>')",54,7.730000000000001e-05,0.0001532
+"('~', 0, '<built-in method builtins.id>')",250,6.52e-05,6.52e-05
+"('~', 0, '<built-in method builtins.isinstance>')",1111,0.0005641,0.0005641
+"('~', 0, '<built-in method builtins.iter>')",84,9.460000000000001e-05,9.460000000000001e-05
+"('~', 0, '<built-in method builtins.len>')",601,0.00023520000000000002,0.0003037
+"('~', 0, '<built-in method builtins.max>')",16,1.94e-05,1.94e-05
+"('~', 0, '<built-in method builtins.min>')",2,2.4000000000000003e-06,2.4000000000000003e-06
+"('~', 0, '<built-in method builtins.ord>')",168,2.3400000000000003e-05,2.3400000000000003e-05
+"('~', 0, '<built-in method builtins.print>')",2,0.0013937,0.0013937
+"('~', 0, '<built-in method builtins.setattr>')",12,1.13e-05,0.0001631
+"('~', 0, '<built-in method builtins.sum>')",24,0.0003213,0.0013514
+"('~', 0, '<built-in method sys.audit>')",2,7.000000000000001e-07,7.000000000000001e-07
+"('~', 0, '<built-in method __new__ of type object at 0x00007FFC8DB1AC70>')",50,9.180000000000001e-05,9.180000000000001e-05
+"('~', 0, '<built-in method unicodedata.east_asian_width>')",2168,0.0003106,0.0003106
+"('~', 0, ""<method 'acquire' of '_multiprocessing.SemLock' objects>"")",14,4.89e-05,4.89e-05
+"('~', 0, ""<method 'release' of '_multiprocessing.SemLock' objects>"")",14,2.4e-05,2.4e-05
