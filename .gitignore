@@ -1,0 +1,5 @@
+# Ignore the h_dataset.pt file in the data folder
+/data/h_dataset.pt
+
+# Ignore all __pycache__ directories in all folders and subfolders
+**/__pycache__/
