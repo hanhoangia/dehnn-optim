@@ -11,7 +11,7 @@
     - [Step 3.2: Create and Activate Conda Environment](#step-32-create-and-activate-conda-environment)
     - [Step 3.3: Install and Activate Dedicated Python Kernel](#step-33-install-and-activate-dedicated-python-kernel)
     - [Step 3.4: Install Pytorch](#step-34-install-pytorch)
-    - [Step 3.5: Install CUDA-related packages (If Used with CUDA)](#step-35-install-cuda-related-packages-if-used-with-cuda)
+    - [Step 3.5: Install Additional Libraries (If Used with CUDA)](#step-35-install-additional-libraries-if-used-with-cuda)
 - [Repo Structure](#repo-structure)
 
 ---
@@ -47,63 +47,46 @@ cd dehnn-optim
 Follow the instructions [here](https://docs.anaconda.com/miniconda/install/) based on the specs of your machine.
 
 #### Step 3.2 Create and Activate Conda Environment
-
 ```bash
 conda install --name "B12-3" --file requirements.txt
 conda activate B12-3
 ```
-
 #### Step 3.3 Install and Activate Dedicated Python Kernel
-
 ```bash
 conda install -c conda-forge nb_conda_kernels
 ```
-
 #### Step 3.4 Install Torch
 
 - For CPU only:
-
 ```bash
 pip install torch=={torch_version} torchvision=={torchvision_version} torchaudio=={torchaudio_version}
 ```
-
 - For use with CUDA (if installed):
-
 ```bash
 pip install torch=={torch_version}+cu{cuda_version} torchvision=={torchvision_version}+cu{cuda_version} torchaudio=={torchaudio_version} --extra-index-url https://download.pytorch.org/whl/cu{cuda_version}
 ```
-
 **Note**: 
 
 Please refer to https://pytorch.org/get-started/previous-versions/ to find the `torchvision_version` and `torchaudio_version`, given the `torch_version` you want to install and/or use. For use with CUDA, please note carefully the `cuda_version` that is on your machine by running `nvidia-smi` and follow the command template.
 
 For example, if `torch_version` = 2.2.2, `torchvision_version` = 0.17.2, `torchaudio_version` = 2.2.2, `cuda_version` = 121 (i.e. 12.1), then the entered command would be:
-
 ```bash
 pip install torch==2.2.2+cu121 torchvision==0.17.2+cu121 torchaudio==2.2.2 --extra-index-url https://download.pytorch.org/whl/cu121
 ```
-
 **Note**: 
 
-#### Step 3.5 Install CUDA-related packages (If Used with CUDA)
+#### Step 3.5 Install Additional Libraries (If Used with CUDA)
 
 You install from the requirements by entering the following command but it will take a lot of time because Pip will build the installer from source:
-
 ```bash
 pip install -r requirements.txt --extra-index-url https://pytorch-geometric.com/whl/torch-{torch_version}+cu{cuda_version}.html
 ```
-
 Instead, do the following: 
 
 - Follow the link `https://pytorch-geometric.com/whl/torch-{torch_version}+cu{cuda_version}.html` and download the appropriate wheels for your machine specs and install the packages using the wheels:
-
-  
-
   ```bash
   pip install {donwloaded_wheel_file_name}
   ```
-
-
 - For Deep Graph Library package requirement, follow the instructions [here](https://www.dgl.ai/pages/start.html) to install a version that works with your Pytorch and CUDA version.
 
 ## Repo Structure
