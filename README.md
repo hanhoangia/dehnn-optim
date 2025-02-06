@@ -10,7 +10,7 @@
     - [Step 3.1: Install Miniconda (If Uninstalled)](#step-31-install-miniconda-if-uninstalled)
     - [Step 3.2: Create and Activate Conda Environment](#step-32-create-and-activate-conda-environment)
     - [Step 3.3: Install and Activate Dedicated Python Kernel](#step-33-install-and-activate-dedicated-python-kernel)
-    - [Step 3.4: Install Pytorch](#step-34-install-pytorch)
+    - [Step 3.4: Install PyTorch](#step-34-install-pytorch)
     - [Step 3.5: Install Additional Libraries (If Used with CUDA)](#step-35-install-additional-libraries-if-used-with-cuda)
 - [Repo Structure](#repo-structure)
 
@@ -57,7 +57,7 @@ conda activate B12-3
 ```bash
 conda install -c conda-forge nb_conda_kernels
 ```
-#### Step 3.4 Install Torch
+#### Step 3.4 Install PyTorch
 
 - For CPU only:
 
