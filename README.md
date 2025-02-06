@@ -53,13 +53,13 @@ conda install --name "B12-3" --file requirements.txt
 conda activate B12-3
 ```
 
-### Step 3.3 Install and Activate a Dedicated Python Kernel
+#### Step 3.3 Install and Activate a Dedicated Python Kernel
 
 ```bash
 conda install -c conda-forge nb_conda_kernels
 ```
 
-### Step 3.4 Install  Torch
+#### Step 3.4 Install  Torch
 
 - For CPU only:
 
@@ -85,7 +85,7 @@ pip install torch==2.2.2+cu121 torchvision==0.17.2+cu121 torchaudio==2.2.2 --ext
 
 **Note**: 
 
-### Step 3.5 Install  CUDA-related packages (If  Used with CUDA)
+#### Step 3.5 Install  CUDA-related packages (If  Used with CUDA)
 
 You install from the requirements by entering the following command but it will take a lot of time because Pip will build the installer from source:
 
@@ -110,7 +110,7 @@ Instead, do the following:
 
 - `README.me`: Includes an overview and reproducing instructions for the project.
 - `cuda_related_packages.txt`: List of CUDA-related libraries required for the project if run on CUDA.
-- `requirements.txt`: List of Python dependencies required for the project.
+- `requirements.txt`: List of Python packages required for the project.
 - `models/`
   - `encoders/`: Stores the data of the assignment.
   - `layers/`: Contains the data description files.
