@@ -25,6 +25,7 @@ from tqdm import tqdm
 from collections import Counter
 
 import sys
+import itertools
 
 sys.path.insert(1, "data/")
 from data.pyg_dataset import NetlistDataset
@@ -39,13 +40,15 @@ restart = False  # if restart training
 reload_dataset = True  # if reload already processed h_dataset
 
 model_type = "dehnn"  # this can be one of ["dehnn", "dehnn_att", "digcn", "digat"] "dehnn_att" might need large memory usage
-num_layer = 3  # large number will cause OOM
-num_dim = 16  # large number will cause OOM
-vn = False  # use virtual node or not
+num_layer_choices = [2, 4]  # Modify based on OOM risk
+num_dim_choices = [16, 32]  # Modify based on memory constraints
+vn = True  # use virtual node or not
 trans = False  # use transformer or not
 aggr = "add"  # use aggregation as one of ["add", "max"]
 device = "cuda"  # use cuda or cpu
 learning_rate = 0.001
+
+search_space = list(itertools.product(num_layer_choices, num_dim_choices))
 
 if not reload_dataset:
     dataset = NetlistDataset(
@@ -134,91 +137,95 @@ else:
 
 sys.path.append("models/layers/")
 
-h_data = h_dataset[0]
-if restart:
-    model = torch.load(f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt")
-else:
-    model = GNN_node(
-        num_layer,
-        num_dim,
-        1,
-        1,
-        node_dim=h_data["node"].x.shape[1],
-        net_dim=h_data["net"].x.shape[1],
-        gnn_type=model_type,
-        vn=vn,
-        trans=trans,
-        aggr=aggr,
-        JK="Normal",
-    ).to(device)
-
-criterion_node = nn.MSELoss()
-criterion_net = nn.MSELoss()
-optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.01)
-### CREATE MEMORY LOG FILE ###
-memory_log_file = "memory_profile.csv"
-if not os.path.exists(memory_log_file):
-    with open(memory_log_file, mode="w", newline="") as file:
+# ** Prepare log file **
+grid_search_log = "grid_search_results.csv"
+if not os.path.exists(grid_search_log):
+    with open(grid_search_log, mode="w", newline="") as file:
         writer = csv.writer(file)
-        writer.writerow(
-            [
-                "epoch",
-                "cpu_memory_mb",
-                "gpu_memory_mb",
-                "gpu_reserved_mb",
-                "gpu_peak_mb",
-            ]
+        writer.writerow(["num_layer", "num_dim", "train_time_sec", "gpu_peak_mb"])
+
+h_data = h_dataset[0]
+
+for num_layer, num_dim in search_space:
+    if restart:
+        model = torch.load(f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt")
+    else:
+        model = GNN_node(
+            num_layer,
+            num_dim,
+            1,
+            1,
+            node_dim=h_data["node"].x.shape[1],
+            net_dim=h_data["net"].x.shape[1],
+            gnn_type=model_type,
+            vn=vn,
+            trans=trans,
+            aggr=aggr,
+            JK="Normal",
         )
 
-### TRAINING LOOP WITH MEMORY PROFILING ###
-best_total_val = None
-load_data_indices = list(range(len(h_dataset)))
-all_train_indices, all_valid_indices = load_data_indices[:3], load_data_indices[3:4]
+    if torch.cuda.device_count() > 1:
+        print(f"Using {torch.cuda.device_count()} GPUs")
+        model = nn.DataParallel(model)  # Wrap model for multi-GPU
 
-print(f"Model is on device: {next(model.parameters()).device}")
-print(f"CUDA Available: {torch.cuda.is_available()}")
-print(f"Model is on device: {next(model.parameters()).device}")
+    model = model.to("cuda")  # Move to GPU
 
-scaler = torch.cuda.amp.GradScaler()  # ⚡ Mixed Precision Training
+    ### DEFINE LOSS FUNCTION & OPTIMIZER ###
+    criterion_node = nn.MSELoss()
+    criterion_net = nn.MSELoss()
+    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.01)
 
-for epoch in range(5):
-    torch.cuda.reset_peak_memory_stats()  # Reset memory tracking
+    ### MEMORY LOG FILE (PEAK GPU MEMORY ONLY) ###
+    memory_log_file = "memory_peak_profile.csv"
+    if not os.path.exists(memory_log_file):
+        with open(memory_log_file, mode="w", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["epoch", "gpu_peak_mb"])
 
-    np.random.shuffle(all_train_indices)
-    loss_node_all, loss_net_all = 0, 0
+    ### TRAINING LOOP WITH PEAK MEMORY PROFILING ###
+    best_total_val = None
+    load_data_indices = list(range(len(h_dataset)))
+    all_train_indices = load_data_indices[:3]
 
-    # Log memory before training starts
-    process = psutil.Process(os.getpid())
-    cpu_memory_mb = process.memory_info().rss / 1024**2
-    torch.cuda.synchronize()
-    gpu_memory_mb = torch.cuda.memory_allocated() / 1024**2
-    gpu_reserved_mb = torch.cuda.memory_reserved() / 1024**2
+    print(f"Model is on device: {next(model.parameters()).device}")
+    print(f"CUDA Available: {torch.cuda.is_available()}")
+    
+    from sklearn.metrics import accuracy_score
 
-    # Move dataset to device once per epoch
-    for data_idx in tqdm(all_train_indices, desc=f"Epoch {epoch+1}"):
-        data = h_dataset[data_idx].to(device)
+    # Initialize accuracy tracking
+    all_predictions = []
+    all_targets = []
 
-        for (
-            target_node,
-            target_net_hpwl,
-            target_net_demand,
-            batch,
-            num_vn,
-            vn_node,
-        ) in data.variant_data_lst:
-            optimizer.zero_grad()
+    for epoch in range(3):
+        start_time = time.time()
+        torch.cuda.reset_peak_memory_stats()  # Reset peak memory tracking
 
-            # Move targets to device
-            target_node, target_net_hpwl, target_net_demand = (
-                target_node.to(device),
-                target_net_hpwl.to(device),
-                target_net_demand.to(device),
-            )
-            batch, vn_node = batch.to(device), vn_node.to(device)
+        np.random.shuffle(all_train_indices)
+        loss_node_all, loss_net_all = 0, 0
 
-            data.batch, data.num_vn, data.vn = batch, num_vn, vn_node
+        for data_idx in tqdm(all_train_indices, desc=f"Epoch {epoch+1}"):
+            data = h_dataset[data_idx].to(device)
 
-            with torch.cuda.amp.autocast():  # ⚡ Enable mixed precision
+            for (
+                target_node,
+                target_net_hpwl,
+                target_net_demand,
+                batch,
+                num_vn,
+                vn_node,
+            ) in data.variant_data_lst:
+                optimizer.zero_grad()
+
+                # Move targets to device
+                target_node, target_net_hpwl, target_net_demand = (
+                    target_node.to(device),
+                    target_net_hpwl.to(device),
+                    target_net_demand.to(device),
+                )
+                batch, vn_node = batch.to(device), vn_node.to(device)
+
+                data.batch, data.num_vn, data.vn = batch, num_vn, vn_node
+
                 node_representation, net_representation = model(data, device)
                 node_representation, net_representation = (
                     torch.squeeze(node_representation),
@@ -229,36 +236,59 @@ for epoch in range(5):
                 loss_net = criterion_net(net_representation, target_net_demand)
                 loss = loss_node + loss_net
 
-            # Use GradScaler for mixed precision
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+                loss.backward()
+                optimizer.step()
 
-            loss_node_all += loss_node.item()
-            loss_net_all += loss_net.item()
+                loss_node_all += loss_node.item()
+                loss_net_all += loss_net.item()
+                
+                
+            all_valid_idx = 0
 
-    # Synchronize before logging GPU memory
-    torch.cuda.synchronize()
-    gpu_peak_mb = torch.cuda.max_memory_allocated() / 1024**2
+        # Get GPU peak memory usage (tracked since last reset)
+        torch.cuda.synchronize()
+        gpu_peak_mb = torch.cuda.max_memory_allocated() / 1024**2
 
-    # Log memory usage to CSV
-    with open(memory_log_file, mode="a", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow(
-            [epoch + 1, cpu_memory_mb, gpu_memory_mb, gpu_reserved_mb, gpu_peak_mb]
+        # Log only peak memory usage to CSV
+        with open(memory_log_file, mode="a", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow([epoch + 1, gpu_peak_mb])
+
+        print(f"Epoch {epoch+1}: Peak GPU Memory = {gpu_peak_mb:.2f}MB")
+
+        # Save best model
+        if (
+            best_total_val is None
+            or (loss_node_all / len(all_train_indices)) < best_total_val
+        ):
+            best_total_val = loss_node_all / len(all_train_indices)
+            torch.save(
+                model.state_dict(),
+                f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt",
+            )
+        total_time = time.time() - start_time
+        
+        # ** Extract peak memory usage from CSV logged by script **
+        with open("memory_peak_profile.csv", mode="r") as file:
+            reader = list(csv.reader(file))
+            gpu_peak_mb = float(reader[-1][1]) if len(reader) > 1 else 0  # Last entry
+
+        # ** Save results to grid search CSV **
+        with open(grid_search_log, mode="a", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow([num_layer, num_dim, total_time, gpu_peak_mb])
+            
+        # Compute final accuracy for the epoch
+        accuracy = accuracy_score(all_targets, all_predictions)
+        print(f"Epoch {epoch+1}: Accuracy = {accuracy:.4f}")
+
+        # Store accuracy results
+        with open("accuracy_results.csv", mode="a", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow([epoch + 1, accuracy])
+
+        print(
+            f"Completed: num_layer={num_layer}, num_dim={num_dim}, Peak Memory={gpu_peak_mb:.2f}MB, Time={total_time:.2f}s"
         )
 
-    print(
-        f"Epoch {epoch+1}: CPU={cpu_memory_mb:.2f}MB, GPU={gpu_memory_mb:.2f}MB, Reserved={gpu_reserved_mb:.2f}MB, Peak={gpu_peak_mb:.2f}MB"
-    )
-
-    # Save best model
-    if (
-        best_total_val is None
-        or (loss_node_all / len(all_train_indices)) < best_total_val
-    ):
-        best_total_val = loss_node_all / len(all_train_indices)
-        torch.save(
-            model.state_dict(),
-            f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt",
-        )
+    
