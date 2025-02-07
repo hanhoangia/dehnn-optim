@@ -27,10 +27,10 @@ from collections import Counter
 import sys
 import itertools
 
-sys.path.insert(1, "data/")
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "..")))  # Add the parent directory to the path
+sys.path.append("../data/")
+sys.path.append("../models/layers/")
 from data.pyg_dataset import NetlistDataset
-
-sys.path.append("models/layers/")
 from models.model_att import GNN_node
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 
@@ -47,6 +47,13 @@ trans = False  # use transformer or not
 aggr = "add"  # use aggregation as one of ["add", "max"]
 device = "cuda"  # use cuda or cpu
 learning_rate = 0.001
+
+parent_directory = os.path.dirname(os.path.abspath(__file__))  # Parent directory of the current script
+data_directory = os.path.join(parent_directory, '..', 'data')
+data_file = os.path.join(data_directory, 'h_dataset.pt')
+memory_directory = os.path.join(parent_directory, '..', 'profiling_results/memory')
+memory_log_file = os.path.join(memory_directory, "memory_peak_profile.csv")
+grid_search_log = os.path.join(memory_directory, "grid_search_results.csv")
 
 search_space = list(itertools.product(num_layer_choices, num_dim_choices))
 
@@ -127,18 +134,15 @@ if not reload_dataset:
         h_data["variant_data_lst"] = variant_data_lst
         h_dataset.append(h_data)
 
-    torch.save(h_dataset, "data/h_dataset.pt")
+    torch.save(h_dataset, data_file)
 
 else:
-    dataset = torch.load("data/h_dataset.pt")
+    dataset = torch.load(data_file)
     h_dataset = []
     for data in dataset:
         h_dataset.append(data)
 
-sys.path.append("models/layers/")
-
 # ** Prepare log file **
-grid_search_log = "profiling_results/memory/grid_search_results.csv"
 if not os.path.exists(grid_search_log):
     with open(grid_search_log, mode="w", newline="") as file:
         writer = csv.writer(file)
@@ -148,6 +152,8 @@ h_data = h_dataset[0]
 
 for num_layer, num_dim in search_space:
     if restart:
+        model_directory = os.path.join(parent_directory, '..', 'models/trained_models')
+        model_file = os.path.join(model_directory, f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt")
         model = torch.load(f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt")
     else:
         model = GNN_node(
@@ -176,7 +182,6 @@ for num_layer, num_dim in search_space:
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.01)
 
     ### MEMORY LOG FILE (PEAK GPU MEMORY ONLY) ###
-    memory_log_file = "profiling_results/memory/memory_peak_profile.csv"
     if not os.path.exists(memory_log_file):
         with open(memory_log_file, mode="w", newline="") as file:
             writer = csv.writer(file)
@@ -268,7 +273,7 @@ for num_layer, num_dim in search_space:
         total_time = time.time() - start_time
 
         # ** Extract peak memory usage from CSV logged by script **
-        with open("profiling_results/memory/memory_peak_profile.csv", mode="r") as file:
+        with open(memory_log_file, mode="r") as file:
             reader = list(csv.reader(file))
             gpu_peak_mb = float(reader[-1][1]) if len(reader) > 1 else 0  # Last entry
 
@@ -282,9 +287,7 @@ for num_layer, num_dim in search_space:
         print(f"Epoch {epoch+1}: Accuracy = {accuracy:.4f}")
 
         # Store accuracy results
-        with open(
-            "profiling_results/memory/accuracy_results.csv", mode="a", newline=""
-        ) as file:
+        with open(memory_log_file, mode="a", newline="") as file:
             writer = csv.writer(file)
             writer.writerow([epoch + 1, accuracy])
 
