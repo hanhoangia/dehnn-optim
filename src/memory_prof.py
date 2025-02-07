@@ -127,10 +127,10 @@ if not reload_dataset:
         h_data["variant_data_lst"] = variant_data_lst
         h_dataset.append(h_data)
 
-    torch.save(h_dataset, "h_dataset.pt")
+    torch.save(h_dataset, "data/h_dataset.pt")
 
 else:
-    dataset = torch.load("h_dataset.pt")
+    dataset = torch.load("data/h_dataset.pt")
     h_dataset = []
     for data in dataset:
         h_dataset.append(data)
@@ -138,7 +138,7 @@ else:
 sys.path.append("models/layers/")
 
 # ** Prepare log file **
-grid_search_log = "grid_search_results.csv"
+grid_search_log = "profiling_results/memory/grid_search_results.csv"
 if not os.path.exists(grid_search_log):
     with open(grid_search_log, mode="w", newline="") as file:
         writer = csv.writer(file)
@@ -176,7 +176,7 @@ for num_layer, num_dim in search_space:
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.01)
 
     ### MEMORY LOG FILE (PEAK GPU MEMORY ONLY) ###
-    memory_log_file = "memory_peak_profile.csv"
+    memory_log_file = "profiling_results/memory/memory_peak_profile.csv"
     if not os.path.exists(memory_log_file):
         with open(memory_log_file, mode="w", newline="") as file:
             writer = csv.writer(file)
@@ -189,7 +189,7 @@ for num_layer, num_dim in search_space:
 
     print(f"Model is on device: {next(model.parameters()).device}")
     print(f"CUDA Available: {torch.cuda.is_available()}")
-    
+
     from sklearn.metrics import accuracy_score
 
     # Initialize accuracy tracking
@@ -241,8 +241,7 @@ for num_layer, num_dim in search_space:
 
                 loss_node_all += loss_node.item()
                 loss_net_all += loss_net.item()
-                
-                
+
             all_valid_idx = 0
 
         # Get GPU peak memory usage (tracked since last reset)
@@ -267,9 +266,9 @@ for num_layer, num_dim in search_space:
                 f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt",
             )
         total_time = time.time() - start_time
-        
+
         # ** Extract peak memory usage from CSV logged by script **
-        with open("memory_peak_profile.csv", mode="r") as file:
+        with open("profiling_results/memory/memory_peak_profile.csv", mode="r") as file:
             reader = list(csv.reader(file))
             gpu_peak_mb = float(reader[-1][1]) if len(reader) > 1 else 0  # Last entry
 
@@ -277,18 +276,18 @@ for num_layer, num_dim in search_space:
         with open(grid_search_log, mode="a", newline="") as file:
             writer = csv.writer(file)
             writer.writerow([num_layer, num_dim, total_time, gpu_peak_mb])
-            
+
         # Compute final accuracy for the epoch
         accuracy = accuracy_score(all_targets, all_predictions)
         print(f"Epoch {epoch+1}: Accuracy = {accuracy:.4f}")
 
         # Store accuracy results
-        with open("accuracy_results.csv", mode="a", newline="") as file:
+        with open(
+            "profiling_results/memory/accuracy_results.csv", mode="a", newline=""
+        ) as file:
             writer = csv.writer(file)
             writer.writerow([epoch + 1, accuracy])
 
         print(
             f"Completed: num_layer={num_layer}, num_dim={num_dim}, Peak Memory={gpu_peak_mb:.2f}MB, Time={total_time:.2f}s"
         )
-
-    
