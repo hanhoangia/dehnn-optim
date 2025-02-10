@@ -24,7 +24,10 @@ from torch_geometric.utils import (
 )
 
 import sys
-sys.path.append("./layers/")
+import os
+# Add the `models/layers` directory to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "layers")))
+
 from dehnn_layers import HyperConvLayer
 from dgnn_layers import DiGraphConvLayer
 

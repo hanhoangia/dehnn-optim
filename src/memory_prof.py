@@ -28,12 +28,11 @@ from collections import Counter
 import sys
 import itertools
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Get the absolute path of the project root
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(project_root)
 
-sys.path.insert(1, "data/")
 from data.pyg_dataset import NetlistDataset
-
-sys.path.append("models/layers/")
 from models.model_att import GNN_node
 
 ### hyperparameter ###
@@ -50,6 +49,12 @@ aggr = "add"  # use aggregation as one of ["add", "max"]
 device = "cuda"  # use cuda or cpu
 learning_rate = 0.001
 
+parent_directory = os.path.dirname(os.path.abspath(__file__))  # Parent directory of the current script
+data_directory = os.path.join(parent_directory, '..', 'data')
+data_file = os.path.join(data_directory, 'h_dataset.pt')
+memory_directory = os.path.join(parent_directory, '..', 'profiling_results/memory')
+memory_log_file = os.path.join(memory_directory, "memory_peak_profile.csv")
+grid_search_log = os.path.join(memory_directory, "grid_search_results.csv")
 
 search_space = list(itertools.product(num_layer_choices, num_dim_choices))
 
@@ -130,21 +135,15 @@ if not reload_dataset:
         h_data["variant_data_lst"] = variant_data_lst
         h_dataset.append(h_data)
 
-    torch.save(h_dataset, "data/h_dataset.pt")
+    torch.save(h_dataset, data_file)
 
 else:
-    dataset = torch.load("data/h_dataset.pt")
+    dataset = torch.load(data_file)
     h_dataset = []
     for data in dataset:
         h_dataset.append(data)
 
-sys.path.append("models/layers/")
-
-# Load validation indices
-all_valid_indices = list(range(len(h_dataset) // 5))
-
 # ** Prepare log file **
-grid_search_log = "profiling_results/memory/grid_search_results.csv"
 if not os.path.exists(grid_search_log):
     with open(grid_search_log, mode="w", newline="") as file:
         writer = csv.writer(file)
@@ -154,6 +153,8 @@ h_data = h_dataset[0]
 
 for num_layer, num_dim in search_space:
     if restart:
+        model_directory = os.path.join(parent_directory, '..', 'models/trained_models')
+        model_file = os.path.join(model_directory, f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt")
         model = torch.load(f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt")
     else:
         model = GNN_node(
@@ -182,7 +183,6 @@ for num_layer, num_dim in search_space:
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.01)
 
     ### MEMORY LOG FILE (PEAK GPU MEMORY ONLY) ###
-    memory_log_file = "profiling_results/memory/memory_peak_profile.csv"
     if not os.path.exists(memory_log_file):
         with open(memory_log_file, mode="w", newline="") as file:
             writer = csv.writer(file)
@@ -198,7 +198,6 @@ for num_layer, num_dim in search_space:
 
     start_time = time.time()
     for epoch in range(3):
-        
         torch.cuda.reset_peak_memory_stats()  # Reset peak memory tracking
 
         np.random.shuffle(all_train_indices)
@@ -269,7 +268,7 @@ for num_layer, num_dim in search_space:
     total_time = time.time() - start_time
 
     # ** Extract peak memory usage from CSV logged by script **
-    with open("profiling_results/memory/memory_peak_profile.csv", mode="r") as file:
+    with open(memory_log_file, mode="r") as file:
         reader = list(csv.reader(file))
         gpu_peak_mb = float(reader[-1][1]) if len(reader) > 1 else 0  # Last entry
 
@@ -278,11 +277,13 @@ for num_layer, num_dim in search_space:
         writer = csv.writer(file)
         writer.writerow([num_layer, num_dim, total_time, gpu_peak_mb])
 
-    print(
-        f"Completed: num_layer={num_layer}, num_dim={num_dim}, Peak Memory={gpu_peak_mb:.2f}MB, Time={total_time:.2f}s"
-    )
+        print(
+            f"Completed: num_layer={num_layer}, num_dim={num_dim}, Peak Memory={gpu_peak_mb:.2f}MB, Time={total_time:.2f}s"
+        )
+    # Load validation indices
+    all_valid_indices = list(range(len(h_dataset) // 5))  # Example split: 20% validation
 
-    # MAE evaluation
+    # Load trained model
     model_path = f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt"
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Trained model not found at {model_path}")
@@ -315,9 +316,7 @@ for num_layer, num_dim in search_space:
 
     # Disable gradient computation for inference
     with torch.no_grad():
-        for data_idx in tqdm(
-            all_valid_indices, desc="Evaluating Model on Validation Set"
-        ):
+        for data_idx in tqdm(all_valid_indices, desc="Evaluating Model on Validation Set"):
             data = h_dataset[data_idx].to(device)
 
             for (

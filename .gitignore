@@ -3,3 +3,6 @@
 
 # Ignore all __pycache__ directories in all folders and subfolders
 **/__pycache__/
+
+# Ignore all .ipynb_checkpoints directories in all folders and subfolders
+**/.ipynb_checkpoints/
