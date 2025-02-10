@@ -49,10 +49,12 @@ aggr = "add"  # use aggregation as one of ["add", "max"]
 device = "cuda"  # use cuda or cpu
 learning_rate = 0.001
 
-parent_directory = os.path.dirname(os.path.abspath(__file__))  # Parent directory of the current script
-data_directory = os.path.join(parent_directory, '..', 'data')
-data_file = os.path.join(data_directory, 'h_dataset.pt')
-memory_directory = os.path.join(parent_directory, '..', 'profiling_results/memory')
+parent_directory = os.path.dirname(
+    os.path.abspath(__file__)
+)  # Parent directory of the current script
+data_directory = os.path.join(parent_directory, "..", "data")
+data_file = os.path.join(data_directory, "h_dataset.pt")
+memory_directory = os.path.join(parent_directory, "..", "profiling_results/memory")
 memory_log_file = os.path.join(memory_directory, "memory_peak_profile.csv")
 grid_search_log = os.path.join(memory_directory, "grid_search_results.csv")
 
@@ -153,8 +155,10 @@ h_data = h_dataset[0]
 
 for num_layer, num_dim in search_space:
     if restart:
-        model_directory = os.path.join(parent_directory, '..', 'models/trained_models')
-        model_file = os.path.join(model_directory, f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt")
+        model_directory = os.path.join(parent_directory, "..", "models/trained_models")
+        model_file = os.path.join(
+            model_directory, f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt"
+        )
         model = torch.load(f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt")
     else:
         model = GNN_node(
@@ -195,6 +199,14 @@ for num_layer, num_dim in search_space:
 
     print(f"Model is on device: {next(model.parameters()).device}")
     print(f"CUDA Available: {torch.cuda.is_available()}")
+
+    # Loss Tracking
+    best_train_loss = float("inf")
+    patience_counter = 0
+    patience = 5  # Define how many epochs of no improvement before stopping
+
+    # Initialize list for logging training losses
+    train_losses = []
 
     start_time = time.time()
     for epoch in range(3):
@@ -255,16 +267,26 @@ for num_layer, num_dim in search_space:
 
         print(f"Epoch {epoch+1}: Peak GPU Memory = {gpu_peak_mb:.2f}MB")
 
-        # Save best model
-        if (
-            best_total_val is None
-            or (loss_node_all / len(all_train_indices)) < best_total_val
-        ):
-            best_total_val = loss_node_all / len(all_train_indices)
+        # Compute average training loss
+        avg_train_loss = (loss_node_all + loss_net_all) / len(all_train_indices)
+        train_losses.append(avg_train_loss)
+
+        # Print loss summary
+        print(f"Epoch {epoch+1}: Train Loss={avg_train_loss:.4f}")
+
+        # Check for improvement
+        if avg_train_loss < best_train_loss:
+            best_train_loss = avg_train_loss
+            patience_counter = 0  # Reset counter
             torch.save(
                 model.state_dict(),
                 f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt",
             )
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print(f"Early stopping triggered at epoch {epoch+1}.")
+                break  # Stop training
     total_time = time.time() - start_time
 
     # ** Extract peak memory usage from CSV logged by script **
@@ -280,8 +302,11 @@ for num_layer, num_dim in search_space:
         print(
             f"Completed: num_layer={num_layer}, num_dim={num_dim}, Peak Memory={gpu_peak_mb:.2f}MB, Time={total_time:.2f}s"
         )
+
     # Load validation indices
-    all_valid_indices = list(range(len(h_dataset) // 5))  # Example split: 20% validation
+    all_valid_indices = list(
+        range(len(h_dataset) // 5)
+    )  # Example split: 20% validation
 
     # Load trained model
     model_path = f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt"
@@ -316,7 +341,9 @@ for num_layer, num_dim in search_space:
 
     # Disable gradient computation for inference
     with torch.no_grad():
-        for data_idx in tqdm(all_valid_indices, desc="Evaluating Model on Validation Set"):
+        for data_idx in tqdm(
+            all_valid_indices, desc="Evaluating Model on Validation Set"
+        ):
             data = h_dataset[data_idx].to(device)
 
             for (
