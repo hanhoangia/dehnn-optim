@@ -122,6 +122,8 @@ Instead, do the following:
 
 - For Deep Graph Library package requirement, follow the instructions [here](https://www.dgl.ai/pages/start.html) to install a version that works with your PyTorch and CUDA version.
 
+---
+
 ## Run the Experiment
 
 There are 2 main source code files to run the experiment, `all_train_cross.py` for single model training and performance, and `grid_search.py` for profiling results with different model configurations using Grid Search.
@@ -152,7 +154,7 @@ python grid_search.py
 
 ## Repo Structure
 
-- `README.md: Includes an overview and reproducing instructions for the project.
+- `README.md`: Includes an overview and reproducing instructions for the project.
 - `cuda_related_packages.txt`: List of CUDA-related libraries required for the project if run on CUDA.
 - `requirements.txt`: List of Python dependencies required for the project.
 - `data`: Contains the dataset description file (i.e. `README_DATA.md`), the source code files to process the data, and the data itself.
