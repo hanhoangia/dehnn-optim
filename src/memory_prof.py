@@ -15,6 +15,7 @@ from torch_geometric.nn.conv.gcn_conv import gcn_norm
 from torch_geometric.nn import global_mean_pool, global_max_pool, global_add_pool
 
 from torch_geometric.utils import scatter
+from sklearn.metrics import mean_absolute_error
 
 # import cProfile
 import cProfile
@@ -27,12 +28,13 @@ from collections import Counter
 import sys
 import itertools
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 sys.path.insert(1, "data/")
 from data.pyg_dataset import NetlistDataset
 
 sys.path.append("models/layers/")
 from models.model_att import GNN_node
-from sklearn.metrics import accuracy_score, precision_score, recall_score
 
 ### hyperparameter ###
 test = False  # if only test but not train
@@ -40,13 +42,14 @@ restart = False  # if restart training
 reload_dataset = True  # if reload already processed h_dataset
 
 model_type = "dehnn"  # this can be one of ["dehnn", "dehnn_att", "digcn", "digat"] "dehnn_att" might need large memory usage
-num_layer_choices = [2, 4]  # Modify based on OOM risk
-num_dim_choices = [16, 32]  # Modify based on memory constraints
+num_layer_choices = [2, 3]  # Modify based on OOM risk
+num_dim_choices = [8]  # Modify based on memory constraints
 vn = True  # use virtual node or not
 trans = False  # use transformer or not
 aggr = "add"  # use aggregation as one of ["add", "max"]
 device = "cuda"  # use cuda or cpu
 learning_rate = 0.001
+
 
 search_space = list(itertools.product(num_layer_choices, num_dim_choices))
 
@@ -137,6 +140,9 @@ else:
 
 sys.path.append("models/layers/")
 
+# Load validation indices
+all_valid_indices = list(range(len(h_dataset) // 5))
+
 # ** Prepare log file **
 grid_search_log = "profiling_results/memory/grid_search_results.csv"
 if not os.path.exists(grid_search_log):
@@ -190,14 +196,9 @@ for num_layer, num_dim in search_space:
     print(f"Model is on device: {next(model.parameters()).device}")
     print(f"CUDA Available: {torch.cuda.is_available()}")
 
-    from sklearn.metrics import accuracy_score
-
-    # Initialize accuracy tracking
-    all_predictions = []
-    all_targets = []
-
+    start_time = time.time()
     for epoch in range(3):
-        start_time = time.time()
+        
         torch.cuda.reset_peak_memory_stats()  # Reset peak memory tracking
 
         np.random.shuffle(all_train_indices)
@@ -265,29 +266,107 @@ for num_layer, num_dim in search_space:
                 model.state_dict(),
                 f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt",
             )
-        total_time = time.time() - start_time
+    total_time = time.time() - start_time
 
-        # ** Extract peak memory usage from CSV logged by script **
-        with open("profiling_results/memory/memory_peak_profile.csv", mode="r") as file:
-            reader = list(csv.reader(file))
-            gpu_peak_mb = float(reader[-1][1]) if len(reader) > 1 else 0  # Last entry
+    # ** Extract peak memory usage from CSV logged by script **
+    with open("profiling_results/memory/memory_peak_profile.csv", mode="r") as file:
+        reader = list(csv.reader(file))
+        gpu_peak_mb = float(reader[-1][1]) if len(reader) > 1 else 0  # Last entry
 
-        # ** Save results to grid search CSV **
-        with open(grid_search_log, mode="a", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow([num_layer, num_dim, total_time, gpu_peak_mb])
+    # ** Save results to grid search CSV **
+    with open(grid_search_log, mode="a", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow([num_layer, num_dim, total_time, gpu_peak_mb])
 
-        # Compute final accuracy for the epoch
-        accuracy = accuracy_score(all_targets, all_predictions)
-        print(f"Epoch {epoch+1}: Accuracy = {accuracy:.4f}")
+    print(
+        f"Completed: num_layer={num_layer}, num_dim={num_dim}, Peak Memory={gpu_peak_mb:.2f}MB, Time={total_time:.2f}s"
+    )
 
-        # Store accuracy results
-        with open(
-            "profiling_results/memory/accuracy_results.csv", mode="a", newline=""
-        ) as file:
-            writer = csv.writer(file)
-            writer.writerow([epoch + 1, accuracy])
+    # MAE evaluation
+    model_path = f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt"
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Trained model not found at {model_path}")
 
-        print(
-            f"Completed: num_layer={num_layer}, num_dim={num_dim}, Peak Memory={gpu_peak_mb:.2f}MB, Time={total_time:.2f}s"
-        )
+    # Initialize the model first
+    model = GNN_node(
+        num_layer,
+        num_dim,
+        1,
+        1,
+        node_dim=h_dataset[0]["node"].x.shape[1],  # Adjust based on dataset
+        net_dim=h_dataset[0]["net"].x.shape[1],
+        gnn_type=model_type,
+        vn=vn,
+        trans=trans,
+        aggr="add",
+        JK="Normal",
+    ).to(device)
+
+    # Load weights into the model
+    model.load_state_dict(torch.load(model_path))
+    model.eval()  # Set model to evaluation mode
+
+    # Define loss function (optional, only if comparing with other metrics)
+    criterion_net = nn.MSELoss()
+
+    # Initialize lists to store predictions and ground truth
+    all_predictions = []
+    all_targets = []
+
+    # Disable gradient computation for inference
+    with torch.no_grad():
+        for data_idx in tqdm(
+            all_valid_indices, desc="Evaluating Model on Validation Set"
+        ):
+            data = h_dataset[data_idx].to(device)
+
+            for (
+                target_node,
+                target_net_hpwl,
+                target_net_demand,
+                batch,
+                num_vn,
+                vn_node,
+            ) in data.variant_data_lst:
+                # Move targets to device
+                target_node, target_net_hpwl, target_net_demand = (
+                    target_node.to(device),
+                    target_net_hpwl.to(device),
+                    target_net_demand.to(device),
+                )
+                batch, vn_node = batch.to(device), vn_node.to(device)
+
+                data.batch, data.num_vn, data.vn = batch, num_vn, vn_node
+
+                # Get predictions from model
+                node_representation, net_representation = model(data, device)
+                node_representation = torch.squeeze(node_representation)
+                net_representation = torch.squeeze(net_representation)
+
+                # Store predictions and ground truth
+                all_predictions.append(net_representation.cpu().numpy())
+                all_targets.append(target_net_demand.cpu().numpy())
+
+    # Convert lists to numpy arrays
+    all_predictions = np.concatenate(all_predictions)
+    all_targets = np.concatenate(all_targets)
+
+    # Compute MAE
+    mae_score = mean_absolute_error(all_targets, all_predictions)
+    print(f"Final MAE on Validation Set: {mae_score:.4f}")
+
+    # Compute optional MSE for comparison
+    mse_score = np.mean((all_predictions - all_targets) ** 2)
+    print(f"Final MSE on Validation Set: {mse_score:.4f}")
+
+    # Log MAE to a CSV file
+    mae_log_dir = "profiling_results/memory"
+    os.makedirs(mae_log_dir, exist_ok=True)
+    mae_log_file = os.path.join(mae_log_dir, "final_mae_results.csv")
+
+    # Write results
+    with open(mae_log_file, mode="a", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow([num_layer, num_dim, mae_score])
+
+    print(f"MAE logged in {mae_log_file}")
