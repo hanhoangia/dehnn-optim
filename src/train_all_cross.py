@@ -44,9 +44,9 @@ def compute_metrics(true_labels, predicted_labels):
     return accuracy, precision, recall
 
 ### hyperparameter ###
-test = True # if only test but not train
+test = False # if only test but not train
 restart = False # if restart training
-reload_dataset = True # if reload already processed h_dataset
+reload_dataset = False # if reload already processed h_dataset
 
 if test:
     restart = True
