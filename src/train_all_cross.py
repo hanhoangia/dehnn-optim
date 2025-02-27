@@ -13,6 +13,8 @@ from torch_geometric.nn.conv.gcn_conv import gcn_norm
 from torch_geometric.nn import global_mean_pool, global_max_pool, global_add_pool
 
 from torch_geometric.utils import scatter
+# import torch.optim.lr_scheduler.CyclicLR
+from torch.optim.lr_scheduler import CyclicLR
 
 import time
 from datetime import datetime
@@ -50,7 +52,7 @@ def early_stopping_condition(val_loss_history, k=10, tol=0.01):
     :param val_loss_history: List of validation losses
     :param patience: Number of epochs to wait before stopping
     :param tol: Tolerance value for improvement in validation loss
-    :return: Boolean value indicating whether to stop training or not
+    :return: If the early stopping condition is met, return the range of the last k validation losses, else return False
     """
     if len(val_loss_history) >= k:
         # Compute the average loss between node and net for each epoch
@@ -142,9 +144,9 @@ if not reload_dataset:
         vn_node = torch.concat([global_mean_pool(h_data['node'].x, batch), 
                 global_max_pool(h_data['node'].x, batch)], dim=1)
 
-        node_demand = (node_demand - torch.mean(node_demand)) / torch.std(node_demand)
+        #node_demand = (node_demand - torch.mean(node_demand)) / torch.std(node_demand)
         net_hpwl = (net_hpwl - torch.mean(net_hpwl)) / torch.std(net_hpwl)
-        net_demand = (net_demand - torch.mean(net_demand))/ torch.std(net_demand)
+        #net_demand = (net_demand - torch.mean(net_demand))/ torch.std(net_demand)
 
         variant_data_lst.append((node_demand, net_hpwl, net_demand, batch, num_vn, vn_node)) 
         h_data['variant_data_lst'] = variant_data_lst
@@ -167,13 +169,15 @@ else:
 criterion_node = nn.MSELoss()
 criterion_net = nn.MSELoss()
 optimizer = optim.AdamW(model.parameters(), lr=learning_rate,  weight_decay=0.01)
+scheduler = CyclicLR(optimizer, base_lr=0.0001, max_lr=0.001, step_size_up=10, step_size_down=10, mode="triangular2")
 load_data_indices = [idx for idx in range(len(h_dataset))]
 all_train_indices, all_valid_indices, all_test_indices = load_data_indices[:5], load_data_indices[10:11], load_data_indices[10:11]
 best_total_val = None
 # only include gradients of the weights; not the gradients of the bias
 layer_gradients = {name: [] for name, _ in model.named_parameters() if "bias" not in name}
 avg_grad_norms_epochs = []
-num_epochs = 5
+num_epochs = 20
+lrs = []
 
 if not test:
     t0 = time.time()
@@ -217,7 +221,14 @@ if not test:
                     if param.grad is not None:
                         layer_gradients[name].append(param.grad.norm().item())
                 
-                optimizer.step()   
+                optimizer.step()
+                scheduler.step()
+
+                # get the scheduler learning rate
+                for param_group in optimizer.param_groups:
+                    current_lr = param_group['lr']
+                    lrs.append(current_lr)
+
     
                 loss_node_all += loss_node.item()
                 loss_net_all += loss_net.item()
@@ -273,6 +284,22 @@ if not test:
             stop_epoch = epoch
             stop_range = stop_result
             break
+
+    # do a line plot of the training losses over the learning rate (lrs)
+    # do a subplot of the training losses for the node and net
+    # smooth out the line plot by taking the moving average of the losses
+    train_losses_node = [loss[0] for loss in train_losses]
+    train_losses_net = [loss[1] for loss in train_losses]
+    val_losses_node = [loss[0] for loss in val_losses]
+    val_losses_net = [loss[1] for loss in val_losses]
+    plt.plot(lrs, train_losses_node, label="train_node_loss")
+    plt.plot(lrs, train_losses_net, label="train_net_loss")
+    plt.xlabel("Learning Rate")
+    plt.ylabel("Loss")
+    plt.title("Training Losses over Learning Rate")
+    plt.legend()
+    plt.savefig(f"{performance_outdirectory}/train_losses.png")
+    plt.close()
 
     # do a line plot of the average gradient norms for the gradients with the same name
     for name, avg_grad_norms in avg_grad_norms_epochs.items():

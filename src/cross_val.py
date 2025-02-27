@@ -145,5 +145,5 @@ with open(os.path.join(performance_outdirectory, "cross_val_loss.txt"), "w") as 
 # save the configuration of the model
 config_file_path = os.path.join(performance_outdirectory, "config.csv")
 with open(config_file_path, "w") as f:
-    f.write("num_layer,num_dim,learning_rate,num_epochs\n")
-    f.write(f"{num_layer},{num_dim},{learning_rate},{num_epochs}")
+    f.write("num_layer,num_dim,vn,learning_rate,num_epochs\n")
+    f.write(f"{num_layer},{num_dim},{vn},{learning_rate},{num_epochs}")
