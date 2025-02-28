@@ -1,0 +1,2 @@
+total_runtime_in_mins,stop_epoch,patience,tolerance,stop_range,best_total_val
+6.258095188935598,25,15,0.1,(82.78572807312013, 101.18255653381348),152.25380096435546
