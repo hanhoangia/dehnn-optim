@@ -1,2 +1,0 @@
-avg_test_node_demand_mse: 1.0536874532699585
-avg_test_net_demand_mse: 1.103714942932129

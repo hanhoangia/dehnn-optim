@@ -13,6 +13,7 @@ from torch_geometric.nn.conv.gcn_conv import gcn_norm
 from torch_geometric.nn import global_mean_pool, global_max_pool, global_add_pool
 
 from torch_geometric.utils import scatter
+from torch.optim.lr_scheduler import CyclicLR
 
 import time
 from datetime import datetime
@@ -56,9 +57,10 @@ def early_stopping_condition(val_loss_history, k=10, tol=0.01):
         # Compute the average loss between node and net for each epoch
         avg_k_losses = [(loss[0] + loss[1]) / 2 for loss in val_loss_history[-k:]]
         # Check if the last k validation losses are still within the tolerance range
-        stop = all(loss > (1 - tol) * avg_k_losses[0] for loss in avg_k_losses[1:])
-        stop_range_diff = (1 - tol) * avg_k_losses[0]
-        stop_range = [avg_k_losses[0] - stop_range_diff, avg_k_losses[0] + stop_range_diff]
+        stop_lower_bound = (1 - tol) * avg_k_losses[0]
+        stop_upper_bound = (1 + tol) * avg_k_losses[0]
+        stop = all([stop_lower_bound <= loss <= stop_upper_bound for loss in avg_k_losses])
+        stop_range = (stop_lower_bound, stop_upper_bound)
         if stop:
             return stop_range
     return False
@@ -78,7 +80,7 @@ vn = True #use virtual node or not
 trans = False #use transformer or not
 aggr = "add" #use aggregation as one of ["add", "max"]
 device = "cuda" #use cuda or cpu
-learning_rate = 0.0001 # default: 0.001
+learning_rate = 0.001 # default: 0.001
 
 parent_directory = os.path.dirname(os.path.abspath(__file__))  # Parent directory of the current script
 data_directory = os.path.join(parent_directory, '..', 'data')
@@ -87,19 +89,10 @@ model_directory = os.path.join(parent_directory, '..', 'models/trained_models')
 model_file_path = os.path.join(model_directory, f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt")
 result_directory = os.path.join(parent_directory, '..', 'profiling_results')
 current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-runtime_directory = os.path.join(result_directory, 'runtime')
-memory_directory = os.path.join(result_directory, 'memory')
-performance_directory = os.path.join(result_directory, 'performance')
-runtime_outdirectory = os.path.join(runtime_directory, current_datetime)  # Subdirectory name based on the current date and time
-memory_outdirectory = os.path.join(memory_directory, current_datetime)  # Subdirectory name based on the current date and time
-performance_outdirectory = os.path.join(performance_directory, current_datetime)  # Subdirectory name based on the current date and time
+out_directory = os.path.join(result_directory, current_datetime)  # Result Metrics subdirectory name based on the current date and time
 # Create the subdirectory if it doesn't exist 
-if not os.path.exists(runtime_outdirectory):
-    os.makedirs(runtime_outdirectory)
-if not os.path.exists(memory_outdirectory):
-    os.makedirs(memory_outdirectory)
-if not os.path.exists(performance_outdirectory):
-    os.makedirs(performance_outdirectory)
+if not os.path.exists(out_directory):
+    os.makedirs(out_directory)
 
 if not reload_dataset:
     dataset = NetlistDataset(data_dir="../data/superblue", load_pe = True, pl = True, processed = True, load_indices=None)
@@ -167,13 +160,16 @@ else:
 criterion_node = nn.MSELoss()
 criterion_net = nn.MSELoss()
 optimizer = optim.AdamW(model.parameters(), lr=learning_rate,  weight_decay=0.01)
+scheduler = CyclicLR(optimizer, base_lr=0.001, max_lr=0.01, cycle_momentum=False, step_size_up=10, step_size_down=10, mode="triangular")
 load_data_indices = [idx for idx in range(len(h_dataset))]
-all_train_indices, all_valid_indices, all_test_indices = load_data_indices[:5], load_data_indices[10:11], load_data_indices[10:11]
+all_train_indices, all_valid_indices, all_test_indices = load_data_indices[2:7], load_data_indices[11:], load_data_indices[11:]
 best_total_val = None
 # only include gradients of the weights; not the gradients of the bias
-layer_gradients = {name: [] for name, _ in model.named_parameters() if "bias" not in name}
-avg_grad_norms_epochs = []
-num_epochs = 5
+#layer_gradients = {name: [] for name, _ in model.named_parameters() if "bias" not in name}
+#avg_grad_norms_epochs = []
+num_epochs = 50
+gpu_peak_mbs = []
+#lrs = []
 
 if not test:
     t0 = time.time()
@@ -181,6 +177,8 @@ if not test:
     val_losses = []
     
     for epoch in range(num_epochs):
+        torch.cuda.reset_peak_memory_stats()
+        
         np.random.shuffle(all_train_indices)
         loss_node_all = 0
         loss_net_all = 0
@@ -205,34 +203,35 @@ if not test:
                 loss = loss_node + loss_net
                 loss.backward()
 
-                #norm_gradients = [torch.sum(torch.pow(torch.tensor(gradient), 2)).item() for gradient in model.parameters() if gradient.grad is not None]
-                #print(f"Epoch {epoch}, Layer-wise L2 norm of gradients: {norm_gradients}")
-                # Gradient clipping
-                #torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-
                 # Get gradients for each layer
-                grads_w = [(name, param) for name, param in model.named_parameters() if "bias" not in name]
+                #grads_w = [(name, param) for name, param in model.named_parameters() if "bias" not in name]
                 
-                for name, param in grads_w:
-                    if param.grad is not None:
-                        layer_gradients[name].append(param.grad.norm().item())
+                #for name, param in grads_w:
+                #    if param.grad is not None:
+                #        layer_gradients[name].append(param.grad.norm().item())
                 
-                optimizer.step()   
+                optimizer.step()
+                scheduler.step()
     
                 loss_node_all += loss_node.item()
                 loss_net_all += loss_net.item()
                 all_train_idx += 1
 
         # Calculate the average gradient norm for each gradient
-        avg_grad_norms_epoch = {name: np.mean(grads) for name, grads in layer_gradients.items() if len(grads) > 0}
-        if epoch == 0:
-            avg_grad_norms_epochs = {name: [avg_grad_norm] for name, avg_grad_norm in avg_grad_norms_epoch.items()}
-        else:
-            for name, avg_grad_norm in avg_grad_norms_epoch.items():
-                avg_grad_norms_epochs[name].append(avg_grad_norm)
+        #avg_grad_norms_epoch = {name: np.mean(grads) for name, grads in layer_gradients.items() if len(grads) > 0}
+        #if epoch == 0:
+        #    avg_grad_norms_epochs = {name: [avg_grad_norm] for name, avg_grad_norm in avg_grad_norms_epoch.items()}
+        #else:
+        #    for name, avg_grad_norm in avg_grad_norms_epoch.items():
+        #        avg_grad_norms_epochs[name].append(avg_grad_norm)
 
         # Clear gradients for the next epoch
-        layer_gradients = {name: [] for name, _ in model.named_parameters() if "bias" not in name}
+        #layer_gradients = {name: [] for name, _ in model.named_parameters() if "bias" not in name}
+
+        # Get GPU peak memory usage (tracked since last reset)
+        torch.cuda.synchronize()
+        gpu_peak_mb = torch.cuda.max_memory_allocated() / 1024**2
+        gpu_peak_mbs.append(gpu_peak_mb)
         
         print(loss_node_all/all_train_idx, loss_net_all/all_train_idx)
         train_losses.append((loss_node_all/all_train_idx, loss_net_all/all_train_idx))
@@ -259,14 +258,18 @@ if not test:
     
         if (best_total_val is None) or ((loss_node_all/all_train_idx) < best_total_val):
             best_total_val = loss_node_all/all_train_idx
-            torch.save(model, f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt")
+            torch.save(model, model_file_path)
+
+        # get the scheduler learning rate
+        #current_lr = optimizer.param_groups[0]['lr']
+        #lrs.append(current_lr)
 
         # stop the training when the early stopping condition is met
-        patience = 10
-        tol = 0.01
+        patience = 5
+        tol = 0.1
         stop_epoch = None
         stop_range = None
-        # if the early stopping condition function does not return False, it means the condition is met
+        #if the early stopping condition function does not return False, it means the condition is met
         stop_result = early_stopping_condition(val_losses, patience, tol)
         if stop_result is not False:
             print("Early stopping condition met at epoch: ", epoch)
@@ -274,35 +277,47 @@ if not test:
             stop_range = stop_result
             break
 
+    # do a line plot of the training losses over the learning rate (lrs)
+    # do a subplot of the training losses for the node and net
+    #plt.subplot(2, 1, 1)
+    #plt.plot(lrs, [loss[0] for loss in train_losses], label="Node Loss")
+    #plt.plot(lrs, [loss[1] for loss in train_losses], label="Net Loss")
+    #plt.xlabel("Learning Rate")
+    #plt.ylabel("Loss")
+    #plt.title("Training Losses over Learning Rate")
+    #plt.legend()
+    #plt.savefig(f"{performance_outdirectory}/lr_losses.png")
+    #plt.close()
+
     # do a line plot of the average gradient norms for the gradients with the same name
-    for name, avg_grad_norms in avg_grad_norms_epochs.items():
-        plt.plot(avg_grad_norms, label=name)
-        plt.xticks(range(0, num_epochs, 1))
-        plt.xlabel("Epoch")
-        plt.ylabel("Average Gradient Norm")
-        plt.title(f"Average Gradient Norms for {name} over {num_epochs} epochs")
-        plt.savefig(f"{performance_outdirectory}/{name}_grad.png")
-        plt.close()
+    #for name, avg_grad_norms in avg_grad_norms_epochs.items():
+    #    plt.plot(avg_grad_norms, label=name)
+    #    plt.xticks(range(0, num_epochs, 1))
+    #    plt.xlabel("Epoch")
+    #    plt.ylabel("Average Gradient Norm")
+    #    plt.title(f"Average Gradient Norms for {name} over {num_epochs} epochs")
+    #    plt.savefig(f"{performance_outdirectory}/{name}_grad.png")
+    #    plt.close()
         
     t1 = time.time()
     total_time = t1 - t0
     total_time_in_mins = total_time / 60
-    other_metrics_file_path = os.path.join(runtime_outdirectory, "other_metrics.csv")
+    other_metrics_file_path = os.path.join(out_directory, "other_metrics.csv")
     with open(other_metrics_file_path, "w") as f:
         f.write("total_runtime_in_mins,stop_epoch,patience,tolerance,stop_range,best_total_val\n")
         if stop_epoch is not None:
             f.write(f"{total_time_in_mins},{stop_epoch},{patience},{tol},{stop_range},{best_total_val}")
         else:
             f.write(f"{total_time_in_mins},N/A,{patience},{tol},N/A,{best_total_val}")
-    print(f"Training runtime and other metrics saved to: {other_metrics_file_path}")
-    loss_file_path = os.path.join(performance_outdirectory, "losses.csv")
-    with open(loss_file_path, "w") as f:
+    print(f"Training runtime and other model metrics saved to: {other_metrics_file_path}")
+    performance_file_path = os.path.join(out_directory, "performance.csv")
+    with open(performance_file_path, "w") as f:
         # write train losses and validation losses in csv format 
         # 5 columns: epoch, train_node_loss, train_net_loss, val_node_loss, val_net_loss
-        f.write("epoch,train_node_loss,train_net_loss,val_node_loss,val_net_loss\n")
+        f.write("epoch,train_node_loss,train_net_loss,val_node_loss,val_net_loss,gpu_peak_memory\n")
         for i in range(len(train_losses)):
-            f.write(f"{i},{train_losses[i][0]},{train_losses[i][1]},{val_losses[i][0]},{val_losses[i][1]}\n")
-    print(f"Train losses and validation losses saved to: {loss_file_path}")
+            f.write(f"{i},{train_losses[i][0]},{train_losses[i][1]},{val_losses[i][0]},{val_losses[i][1]},{gpu_peak_mbs[i]}\n")
+    print(f"Performance metrics saved to: {performance_file_path}")
 else:
     all_test_idx = 0
     test_loss_node_all = 0
@@ -329,14 +344,14 @@ else:
     print("avg test node demand mse: ", avg_test_node_demand_mse)
     print("avg test net demand mse: ", avg_test_net_demand_mse)
 
-    file_path = os.path.join(performance_outdirectory, "test_performance.txt")
+    file_path = os.path.join(out_directory, "test_performance.txt")
     with open(file_path, "w") as f:
         f.write(f"Average test MSE for node demand regression: {avg_test_node_demand_mse}\n")
         f.write(f"Average test MSE for net demand regression: {avg_test_net_demand_mse}")
     print(f"Test performance result saved to: {file_path}")
 
 # save the configuration of the model
-config_file_path = os.path.join(performance_outdirectory, "config.csv")
+config_file_path = os.path.join(out_directory, "config.csv")
 with open(config_file_path, "w") as f:
-    f.write("num_layer,num_dim,learning_rate,num_epochs\n")
-    f.write(f"{num_layer},{num_dim},{learning_rate},{num_epochs}")
+    f.write("num_layer,num_dim,vn,learning_rate,num_epochs\n")
+    f.write(f"{num_layer},{num_dim},{vn},{learning_rate},{num_epochs}")
