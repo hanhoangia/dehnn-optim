@@ -1,398 +1,405 @@
 import os
-import numpy as np
-import pickle
+import sys
+import time
 import csv
-import psutil
-
+import itertools
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
-from torch_geometric.data import Dataset
-from torch_geometric.data import Data, HeteroData
-from torch_geometric.loader import NeighborLoader
-from torch_geometric.nn.conv.gcn_conv import gcn_norm
-from torch_geometric.nn import global_mean_pool, global_max_pool, global_add_pool
-
-from torch_geometric.utils import scatter
-from sklearn.metrics import mean_absolute_error
-
-# import cProfile
-import cProfile
-
-import time
-import wandb
 from tqdm import tqdm
-from collections import Counter
 
-import sys
-import itertools
+from torch_geometric.data import HeteroData
+from torch_geometric.nn.conv.gcn_conv import gcn_norm
+from torch_geometric.nn import global_mean_pool, global_max_pool
 
-# Get the absolute path of the project root
+# Directories and file paths
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
+parent_directory = os.path.dirname(os.path.abspath(__file__))
+data_directory = os.path.join(parent_directory, "..", "data")
+data_file = os.path.join(data_directory, "h_dataset.pt")
+profiling_dir = os.path.join(parent_directory, "..", "profiling_results")
+# All logs are stored in one folder called "gridsearch"
+gridsearch_dir = os.path.join(profiling_dir, "gridsearch")
+os.makedirs(gridsearch_dir, exist_ok=True)
+
+# Log file paths (all inside gridsearch_dir)
+memory_log_file = os.path.join(gridsearch_dir, "memory_peak_profile.csv")
+grid_search_log = os.path.join(gridsearch_dir, "grid_search_results.csv")
+early_stop_log_file = os.path.join(gridsearch_dir, "early_stop_epochs.csv")
+train_loss_log_file = os.path.join(gridsearch_dir, "training_loss_log.csv")
+mse_log_file = os.path.join(gridsearch_dir, "final_mse_results.csv")
 
 from data.pyg_dataset import NetlistDataset
 from models.model_att import GNN_node
 
-### hyperparameter ###
-test = False  # if only test but not train
-restart = False  # if restart training
-reload_dataset = True  # if reload already processed h_dataset
+### Configuration and Hyperparameters ###
+test = False  # if only testing but not training
+restart = True  # if restarting training (load saved model)
+reload_dataset = True  # if reloading an already processed dataset
 
-model_type = "dehnn"  # this can be one of ["dehnn", "dehnn_att", "digcn", "digat"] "dehnn_att" might need large memory usage
-num_layer_choices = [2, 3]  # Modify based on OOM risk
-num_dim_choices = [8]  # Modify based on memory constraints
-vn = True  # use virtual node or not
+model_type = "dehnn"  # choices: ["dehnn", "dehnn_att", "digcn", "digat"]
+num_layer_choices = [2, 3, 4]
+num_dim_choices = [8, 16, 32]
+vn = True  # use virtual node (enabled)
 trans = False  # use transformer or not
-aggr = "add"  # use aggregation as one of ["add", "max"]
-device = "cuda"  # use cuda or cpu
+aggr = "add"  # aggregation function: "add" or "max"
+device = "cuda"  # "cuda" or "cpu"
 learning_rate = 0.001
 
-parent_directory = os.path.dirname(
-    os.path.abspath(__file__)
-)  # Parent directory of the current script
-data_directory = os.path.join(parent_directory, "..", "data")
-data_file = os.path.join(data_directory, "h_dataset.pt")
-memory_directory = os.path.join(parent_directory, "..", "profiling_results/memory")
-memory_log_file = os.path.join(memory_directory, "memory_peak_profile.csv")
-grid_search_log = os.path.join(memory_directory, "grid_search_results.csv")
+# Use a smaller training set: first 7 examples for training, rest for validation
+TRAIN_SAMPLES = 7
 
-search_space = list(itertools.product(num_layer_choices, num_dim_choices))
+# Early stopping settings: only check early stopping after at least MIN_EPOCHS,
+# and stop if the relative improvement over the last PATIENCE epochs is less than TOLERANCE.
+PATIENCE = 5
+TOLERANCE = 0.1
+MIN_EPOCHS = 10
 
-if not reload_dataset:
-    dataset = NetlistDataset(
-        data_dir="data/superblue",
-        load_pe=True,
-        pl=True,
-        processed=True,
-        load_indices=None,
-    )
-    h_dataset = []
-    for data in tqdm(dataset):
-        num_instances = data.node_features.shape[0]
-        data.num_instances = num_instances
-        data.edge_index_sink_to_net[1] = data.edge_index_sink_to_net[1] - num_instances
-        data.edge_index_source_to_net[1] = (
-            data.edge_index_source_to_net[1] - num_instances
+
+def early_stopping_condition(
+    val_loss_history, patience=PATIENCE, tol=TOLERANCE, min_epochs=MIN_EPOCHS
+):
+    """
+    Check if the early stopping condition is met.
+    Only check if at least min_epochs have passed.
+    It computes the average validation loss for the last 'patience' epochs and
+    stops if the relative improvement (difference between the first and last epoch in this window)
+    is less than tol times the first epoch's loss.
+    """
+    if len(val_loss_history) < min_epochs:
+        return False
+    recent_losses = [(loss[0] + loss[1]) / 2 for loss in val_loss_history[-patience:]]
+    improvement = recent_losses[0] - recent_losses[-1]
+    if improvement < tol * recent_losses[0]:
+        return True
+    return False
+
+
+def setup_logging():
+    # All logs are in gridsearch_dir which is already created
+    if not os.path.exists(grid_search_log):
+        with open(grid_search_log, mode="w", newline="") as file:
+            csv.writer(file).writerow(
+                [
+                    "num_layer",
+                    "num_dim",
+                    "train_time_sec",
+                    "gpu_peak_mb",
+                    "best_train_loss",
+                    "val_node_mse",
+                    "val_net_mse",
+                ]
+            )
+    if not os.path.exists(train_loss_log_file):
+        with open(train_loss_log_file, mode="w", newline="") as file:
+            csv.writer(file).writerow(["num_layer", "num_dim", "epoch", "train_loss"])
+    if not os.path.exists(memory_log_file):
+        with open(memory_log_file, mode="w", newline="") as file:
+            csv.writer(file).writerow(["epoch", "gpu_peak_mb"])
+    if not os.path.exists(early_stop_log_file):
+        with open(early_stop_log_file, mode="w", newline="") as file:
+            csv.writer(file).writerow(["num_layer", "num_dim", "early_stop_epoch"])
+
+
+def load_data():
+    if not reload_dataset:
+        dataset = NetlistDataset(
+            data_dir="data/superblue",
+            load_pe=True,
+            pl=True,
+            processed=True,
+            load_indices=None,
         )
-
-        out_degrees = data.net_features[:, 1]
-        mask = out_degrees < 3000
-        mask_edges = mask[data.edge_index_source_to_net[1]]
-        filtered_edge_index_source_to_net = data.edge_index_source_to_net[:, mask_edges]
-        data.edge_index_source_to_net = filtered_edge_index_source_to_net
-
-        mask_edges = mask[data.edge_index_sink_to_net[1]]
-        filtered_edge_index_sink_to_net = data.edge_index_sink_to_net[:, mask_edges]
-        data.edge_index_sink_to_net = filtered_edge_index_sink_to_net
-
-        h_data = HeteroData()
-        h_data["node"].x = data.node_features
-        h_data["net"].x = data.net_features
-
-        edge_index = torch.concat(
-            [data.edge_index_sink_to_net, data.edge_index_source_to_net], dim=1
-        )
-        (
-            h_data["node", "to", "net"].edge_index,
-            h_data["node", "to", "net"].edge_weight,
-        ) = gcn_norm(edge_index, add_self_loops=False)
-        h_data["node", "to", "net"].edge_type = torch.concat(
-            [
-                torch.zeros(data.edge_index_sink_to_net.shape[1]),
-                torch.ones(data.edge_index_source_to_net.shape[1]),
+        h_dataset = []
+        for data in tqdm(dataset, desc="Processing dataset"):
+            num_instances = data.node_features.shape[0]
+            data.num_instances = num_instances
+            # Adjust edge indices
+            data.edge_index_sink_to_net[1] -= num_instances
+            data.edge_index_source_to_net[1] -= num_instances
+            # Filter edges based on net feature
+            out_degrees = data.net_features[:, 1]
+            mask = out_degrees < 3000
+            data.edge_index_source_to_net = data.edge_index_source_to_net[
+                :, mask[data.edge_index_source_to_net[1]]
             ]
-        ).bool()
-        (
-            h_data["net", "to", "node"].edge_index,
-            h_data["net", "to", "node"].edge_weight,
-        ) = gcn_norm(edge_index.flip(0), add_self_loops=False)
+            data.edge_index_sink_to_net = data.edge_index_sink_to_net[
+                :, mask[data.edge_index_sink_to_net[1]]
+            ]
+            h_data = HeteroData()
+            h_data["node"].x = data.node_features
+            h_data["net"].x = data.net_features
+            edge_index = torch.concat(
+                [data.edge_index_sink_to_net, data.edge_index_source_to_net], dim=1
+            )
+            (
+                h_data["node", "to", "net"].edge_index,
+                h_data["node", "to", "net"].edge_weight,
+            ) = gcn_norm(edge_index, add_self_loops=False)
+            h_data["node", "to", "net"].edge_type = torch.concat(
+                [
+                    torch.zeros(data.edge_index_sink_to_net.shape[1]),
+                    torch.ones(data.edge_index_source_to_net.shape[1]),
+                ]
+            ).bool()
+            (
+                h_data["net", "to", "node"].edge_index,
+                h_data["net", "to", "node"].edge_weight,
+            ) = gcn_norm(edge_index.flip(0), add_self_loops=False)
+            h_data["design_name"] = data["design_name"]
+            h_data.num_instances = num_instances
 
-        h_data["design_name"] = data["design_name"]
-        h_data.num_instances = data.node_features.shape[0]
-        variant_data_lst = []
-
-        node_demand = data.node_demand
-        net_demand = data.net_demand
-        net_hpwl = data.net_hpwl
-
-        batch = data.batch
-        num_vn = len(np.unique(batch))
-        vn_node = torch.concat(
-            [
-                global_mean_pool(h_data["node"].x, batch),
-                global_max_pool(h_data["node"].x, batch),
-            ],
-            dim=1,
-        )
-
-        node_demand = (node_demand - torch.mean(node_demand)) / torch.std(node_demand)
-        net_hpwl = (net_hpwl - torch.mean(net_hpwl)) / torch.std(net_hpwl)
-        net_demand = (net_demand - torch.mean(net_demand)) / torch.std(net_demand)
-
-        variant_data_lst.append(
-            (node_demand, net_hpwl, net_demand, batch, num_vn, vn_node)
-        )
-        h_data["variant_data_lst"] = variant_data_lst
-        h_dataset.append(h_data)
-
-    torch.save(h_dataset, data_file)
-
-else:
-    dataset = torch.load(data_file)
-    h_dataset = []
-    for data in dataset:
-        h_dataset.append(data)
-
-# ** Prepare log file **
-if not os.path.exists(grid_search_log):
-    with open(grid_search_log, mode="w", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow(["num_layer", "num_dim", "train_time_sec", "gpu_peak_mb"])
-
-h_data = h_dataset[0]
-
-for num_layer, num_dim in search_space:
-    if restart:
-        model_directory = os.path.join(parent_directory, "..", "models/trained_models")
-        model_file = os.path.join(
-            model_directory, f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt"
-        )
-        model = torch.load(f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt")
+            # Prepare variant data: normalize targets and compute virtual node features
+            vn_node = torch.concat(
+                [
+                    global_mean_pool(h_data["node"].x, data.batch),
+                    global_max_pool(h_data["node"].x, data.batch),
+                ],
+                dim=1,
+            )
+            node_demand = (data.node_demand - torch.mean(data.node_demand)) / torch.std(
+                data.node_demand
+            )
+            net_demand = (data.net_demand - torch.mean(data.net_demand)) / torch.std(
+                data.net_demand
+            )
+            net_hpwl = (data.net_hpwl - torch.mean(data.net_hpwl)) / torch.std(
+                data.net_hpwl
+            )
+            variant_data = (
+                node_demand,
+                net_hpwl,
+                net_demand,
+                data.batch,
+                len(np.unique(data.batch)),
+                vn_node,
+            )
+            h_data["variant_data_lst"] = [variant_data]
+            h_dataset.append(h_data)
+        torch.save(h_dataset, data_file)
     else:
-        model = GNN_node(
-            num_layer,
-            num_dim,
-            1,
-            1,
-            node_dim=h_data["node"].x.shape[1],
-            net_dim=h_data["net"].x.shape[1],
-            gnn_type=model_type,
-            vn=vn,
-            trans=trans,
-            aggr=aggr,
-            JK="Normal",
-        )
+        h_dataset = torch.load(data_file)
+    return h_dataset
 
-    if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs")
-        model = nn.DataParallel(model)  # Wrap model for multi-GPU
 
-    model = model.to("cuda")  # Move to GPU
+def build_model(h_data, current_num_layer, current_num_dim):
+    model = GNN_node(
+        current_num_layer,
+        current_num_dim,
+        1,
+        1,
+        node_dim=h_data["node"].x.shape[1],
+        net_dim=h_data["net"].x.shape[1],
+        gnn_type=model_type,
+        vn=vn,
+        trans=trans,
+        aggr=aggr,
+        JK="Normal",
+    )
+    return model.to(device)
 
-    ### DEFINE LOSS FUNCTION & OPTIMIZER ###
+
+def train_model(model, h_dataset, current_num_layer, current_num_dim):
     criterion_node = nn.MSELoss()
     criterion_net = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.01)
+    all_indices = list(range(len(h_dataset)))
+    train_indices = all_indices[:TRAIN_SAMPLES]
+    valid_indices = all_indices[TRAIN_SAMPLES:]
 
-    ### MEMORY LOG FILE (PEAK GPU MEMORY ONLY) ###
-    if not os.path.exists(memory_log_file):
-        with open(memory_log_file, mode="w", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(["epoch", "gpu_peak_mb"])
-
-    ### TRAINING LOOP WITH PEAK MEMORY PROFILING ###
-    best_total_val = None
-    load_data_indices = list(range(len(h_dataset)))
-    all_train_indices = load_data_indices[:3]
-
-    print(f"Model is on device: {next(model.parameters()).device}")
-    print(f"CUDA Available: {torch.cuda.is_available()}")
-
-    # Loss Tracking
-    best_train_loss = float("inf")
-    patience_counter = 0
-    patience = 5  # Define how many epochs of no improvement before stopping
-
-    # Initialize list for logging training losses
-    train_losses = []
+    best_val_loss = float("inf")
+    best_epoch = None
+    val_losses = []  # list of tuples: (avg_val_node_loss, avg_val_net_loss)
+    max_gpu_mem = 0.0
 
     start_time = time.time()
-    for epoch in range(3):
-        torch.cuda.reset_peak_memory_stats()  # Reset peak memory tracking
+    num_epochs = 200
+    for epoch in range(num_epochs):
+        np.random.shuffle(train_indices)
+        loss_node_all = 0.0
+        loss_net_all = 0.0
+        count = 0
 
-        np.random.shuffle(all_train_indices)
-        loss_node_all, loss_net_all = 0, 0
-
-        for data_idx in tqdm(all_train_indices, desc=f"Epoch {epoch+1}"):
+        model.train()
+        torch.cuda.reset_peak_memory_stats()
+        for data_idx in tqdm(train_indices, desc=f"Epoch {epoch+1} Training"):
             data = h_dataset[data_idx].to(device)
-
-            for (
-                target_node,
-                target_net_hpwl,
-                target_net_demand,
-                batch,
-                num_vn,
-                vn_node,
-            ) in data.variant_data_lst:
+            for variant in data.variant_data_lst:
+                (
+                    target_node,
+                    target_net_hpwl,
+                    target_net_demand,
+                    batch,
+                    num_vn,
+                    vn_node,
+                ) = variant
                 optimizer.zero_grad()
-
-                # Move targets to device
-                target_node, target_net_hpwl, target_net_demand = (
-                    target_node.to(device),
-                    target_net_hpwl.to(device),
-                    target_net_demand.to(device),
-                )
-                batch, vn_node = batch.to(device), vn_node.to(device)
-
-                data.batch, data.num_vn, data.vn = batch, num_vn, vn_node
-
-                node_representation, net_representation = model(data, device)
-                node_representation, net_representation = (
-                    torch.squeeze(node_representation),
-                    torch.squeeze(net_representation),
-                )
-
-                loss_node = criterion_node(node_representation, target_node)
-                loss_net = criterion_net(net_representation, target_net_demand)
+                data.batch = batch.to(device)
+                data.num_vn = num_vn
+                data.vn = vn_node.to(device)
+                node_rep, net_rep = model(data, device)
+                node_rep = torch.squeeze(node_rep)
+                net_rep = torch.squeeze(net_rep)
+                loss_node = criterion_node(node_rep, target_node.to(device))
+                loss_net = criterion_net(net_rep, target_net_demand.to(device))
                 loss = loss_node + loss_net
-
                 loss.backward()
                 optimizer.step()
 
                 loss_node_all += loss_node.item()
                 loss_net_all += loss_net.item()
+                count += 1
 
-            all_valid_idx = 0
-
-        # Get GPU peak memory usage (tracked since last reset)
         torch.cuda.synchronize()
-        gpu_peak_mb = torch.cuda.max_memory_allocated() / 1024**2
+        gpu_peak = torch.cuda.max_memory_allocated() / (1024**2)
+        max_gpu_mem = max(max_gpu_mem, gpu_peak)
+        print(f"Epoch {epoch+1}: Peak GPU Memory = {gpu_peak:.2f}MB")
 
-        # Log only peak memory usage to CSV
-        with open(memory_log_file, mode="a", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow([epoch + 1, gpu_peak_mb])
-
-        print(f"Epoch {epoch+1}: Peak GPU Memory = {gpu_peak_mb:.2f}MB")
-
-        # Compute average training loss
-        avg_train_loss = (loss_node_all + loss_net_all) / len(all_train_indices)
-        train_losses.append(avg_train_loss)
-
-        # Print loss summary
-        print(f"Epoch {epoch+1}: Train Loss={avg_train_loss:.4f}")
-
-        # Check for improvement
-        if avg_train_loss < best_train_loss:
-            best_train_loss = avg_train_loss
-            patience_counter = 0  # Reset counter
-            torch.save(
-                model.state_dict(),
-                f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt",
+        avg_train_loss = (loss_node_all + loss_net_all) / len(train_indices)
+        with open(train_loss_log_file, mode="a", newline="") as file:
+            csv.writer(file).writerow(
+                [current_num_layer, current_num_dim, epoch + 1, avg_train_loss]
             )
-        else:
-            patience_counter += 1
-            if patience_counter >= patience:
-                print(f"Early stopping triggered at epoch {epoch+1}.")
-                break  # Stop training
-    total_time = time.time() - start_time
+        print(f"Epoch {epoch+1}: Train Loss = {avg_train_loss:.4f}")
 
-    # ** Extract peak memory usage from CSV logged by script **
-    with open(memory_log_file, mode="r") as file:
-        reader = list(csv.reader(file))
-        gpu_peak_mb = float(reader[-1][1]) if len(reader) > 1 else 0  # Last entry
-
-    # ** Save results to grid search CSV **
-    with open(grid_search_log, mode="a", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow([num_layer, num_dim, total_time, gpu_peak_mb])
-
+        # Validation loop
+        model.eval()
+        val_loss_node_all = 0.0
+        val_loss_net_all = 0.0
+        val_count = 0
+        with torch.no_grad():
+            for data_idx in tqdm(valid_indices, desc=f"Epoch {epoch+1} Validation"):
+                data = h_dataset[data_idx].to(device)
+                for variant in data.variant_data_lst:
+                    (
+                        target_node,
+                        target_net_hpwl,
+                        target_net_demand,
+                        batch,
+                        num_vn,
+                        vn_node,
+                    ) = variant
+                    data.batch = batch.to(device)
+                    data.num_vn = num_vn
+                    data.vn = vn_node.to(device)
+                    node_rep, net_rep = model(data, device)
+                    node_rep = torch.squeeze(node_rep)
+                    net_rep = torch.squeeze(net_rep)
+                    loss_node = criterion_node(node_rep, target_node.to(device))
+                    loss_net = criterion_net(net_rep, target_net_demand.to(device))
+                    val_loss_node_all += loss_node.item()
+                    val_loss_net_all += loss_net.item()
+                    val_count += 1
+        avg_val_node_loss = val_loss_node_all / val_count if val_count > 0 else 0.0
+        avg_val_net_loss = val_loss_net_all / val_count if val_count > 0 else 0.0
         print(
-            f"Completed: num_layer={num_layer}, num_dim={num_dim}, Peak Memory={gpu_peak_mb:.2f}MB, Time={total_time:.2f}s"
+            f"Epoch {epoch+1} Val Losses - Node: {avg_val_node_loss:.4f}, Net: {avg_val_net_loss:.4f}"
+        )
+        val_losses.append((avg_val_node_loss, avg_val_net_loss))
+
+        # Check early stopping condition (only after MIN_EPOCHS)
+        if early_stopping_condition(
+            val_losses, patience=PATIENCE, tol=TOLERANCE, min_epochs=MIN_EPOCHS
+        ):
+            print(f"Early stopping condition met at epoch {epoch+1}")
+            with open(early_stop_log_file, mode="a", newline="") as file:
+                csv.writer(file).writerow(
+                    [current_num_layer, current_num_dim, epoch + 1]
+                )
+            break
+
+        # Save best model if current val loss sum is lower than best so far
+        current_val_loss = avg_val_node_loss + avg_val_net_loss
+        if current_val_loss < best_val_loss:
+            best_val_loss = current_val_loss
+            best_epoch = epoch + 1
+            model_path = f"{model_type}_{current_num_layer}_{current_num_dim}_{vn}_{trans}_model.pt"
+            torch.save(model.state_dict(), model_path)
+
+    total_time = time.time() - start_time
+    return total_time, best_epoch, max_gpu_mem
+
+
+def evaluate_model(model, h_dataset, current_num_layer, current_num_dim):
+    all_valid_indices = list(range(max(1, len(h_dataset) // 5)))
+    node_predictions, node_targets = [], []
+    net_predictions, net_targets = [], []
+
+    model.eval()
+    with torch.no_grad():
+        for data_idx in tqdm(all_valid_indices, desc="Evaluating Model"):
+            data = h_dataset[data_idx].to(device)
+            for variant in data.variant_data_lst:
+                target_node, _, target_net_demand, batch, num_vn, vn_node = variant
+                batch, vn_node = batch.to(device), vn_node.to(device)
+                data.batch, data.num_vn, data.vn = batch, num_vn, vn_node
+                node_rep, net_rep = model(data, device)
+                node_rep = torch.squeeze(node_rep)
+                net_rep = torch.squeeze(net_rep)
+                node_predictions.append(node_rep.cpu().numpy())
+                node_targets.append(target_node.cpu().numpy())
+                net_predictions.append(net_rep.cpu().numpy())
+                net_targets.append(target_net_demand.cpu().numpy())
+
+    node_predictions = np.concatenate(node_predictions)
+    node_targets = np.concatenate(node_targets)
+    net_predictions = np.concatenate(net_predictions)
+    net_targets = np.concatenate(net_targets)
+
+    mse_node = np.mean((node_predictions - node_targets) ** 2)
+    mse_net = np.mean((net_predictions - net_targets) ** 2)
+    print(f"Final MSE on Validation Set - Node: {mse_node:.4f}, Net: {mse_net:.4f}")
+
+    with open(mse_log_file, mode="a", newline="") as file:
+        csv.writer(file).writerow(
+            [current_num_layer, current_num_dim, mse_node, mse_net]
+        )
+    return mse_node, mse_net
+
+
+def main():
+    setup_logging()
+    h_dataset = load_data()
+    h_data = h_dataset[0]
+
+    for current_num_layer, current_num_dim in itertools.product(
+        num_layer_choices, num_dim_choices
+    ):
+        print(
+            f"\n=== Grid Search: Layers={current_num_layer}, Dim={current_num_dim} ==="
+        )
+        model = build_model(h_data, current_num_layer, current_num_dim)
+        total_time, best_epoch, gpu_peak = train_model(
+            model, h_dataset, current_num_layer, current_num_dim
+        )
+        print(
+            f"Training completed in {total_time:.2f}s; best epoch: {best_epoch}; Peak GPU Memory: {gpu_peak:.2f} MB"
+        )
+        model_path = (
+            f"{model_type}_{current_num_layer}_{current_num_dim}_{vn}_{trans}_model.pt"
+        )
+        model = build_model(h_data, current_num_layer, current_num_dim)
+        model.load_state_dict(torch.load(model_path))
+        val_node_mse, val_net_mse = evaluate_model(
+            model, h_dataset, current_num_layer, current_num_dim
+        )
+        with open(grid_search_log, mode="a", newline="") as file:
+            csv.writer(file).writerow(
+                [
+                    current_num_layer,
+                    current_num_dim,
+                    total_time,
+                    gpu_peak,
+                    val_node_mse,
+                    val_net_mse,
+                ]
+            )
+        print(
+            f"Completed: Layers={current_num_layer}, Dim={current_num_dim}, Peak Memory={gpu_peak:.2f}MB, Time={total_time:.2f}s"
         )
 
-    # Load validation indices
-    all_valid_indices = list(
-        range(len(h_dataset) // 5)
-    )  # Example split: 20% validation
 
-    # Load trained model
-    model_path = f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt"
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Trained model not found at {model_path}")
-
-    # Initialize the model first
-    model = GNN_node(
-        num_layer,
-        num_dim,
-        1,
-        1,
-        node_dim=h_dataset[0]["node"].x.shape[1],  # Adjust based on dataset
-        net_dim=h_dataset[0]["net"].x.shape[1],
-        gnn_type=model_type,
-        vn=vn,
-        trans=trans,
-        aggr="add",
-        JK="Normal",
-    ).to(device)
-
-    # Load weights into the model
-    model.load_state_dict(torch.load(model_path))
-    model.eval()  # Set model to evaluation mode
-
-    # Define loss function (optional, only if comparing with other metrics)
-    criterion_net = nn.MSELoss()
-
-    # Initialize lists to store predictions and ground truth
-    all_predictions = []
-    all_targets = []
-
-    # Disable gradient computation for inference
-    with torch.no_grad():
-        for data_idx in tqdm(
-            all_valid_indices, desc="Evaluating Model on Validation Set"
-        ):
-            data = h_dataset[data_idx].to(device)
-
-            for (
-                target_node,
-                target_net_hpwl,
-                target_net_demand,
-                batch,
-                num_vn,
-                vn_node,
-            ) in data.variant_data_lst:
-                # Move targets to device
-                target_node, target_net_hpwl, target_net_demand = (
-                    target_node.to(device),
-                    target_net_hpwl.to(device),
-                    target_net_demand.to(device),
-                )
-                batch, vn_node = batch.to(device), vn_node.to(device)
-
-                data.batch, data.num_vn, data.vn = batch, num_vn, vn_node
-
-                # Get predictions from model
-                node_representation, net_representation = model(data, device)
-                node_representation = torch.squeeze(node_representation)
-                net_representation = torch.squeeze(net_representation)
-
-                # Store predictions and ground truth
-                all_predictions.append(net_representation.cpu().numpy())
-                all_targets.append(target_net_demand.cpu().numpy())
-
-    # Convert lists to numpy arrays
-    all_predictions = np.concatenate(all_predictions)
-    all_targets = np.concatenate(all_targets)
-
-    # Compute MAE
-    mae_score = mean_absolute_error(all_targets, all_predictions)
-    print(f"Final MAE on Validation Set: {mae_score:.4f}")
-
-    # Compute optional MSE for comparison
-    mse_score = np.mean((all_predictions - all_targets) ** 2)
-    print(f"Final MSE on Validation Set: {mse_score:.4f}")
-
-    # Log MAE to a CSV file
-    mae_log_dir = "profiling_results/memory"
-    os.makedirs(mae_log_dir, exist_ok=True)
-    mae_log_file = os.path.join(mae_log_dir, "final_mae_results.csv")
-
-    # Write results
-    with open(mae_log_file, mode="a", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow([num_layer, num_dim, mae_score])
-
-    print(f"MAE logged in {mae_log_file}")
+if __name__ == "__main__":
+    main()
