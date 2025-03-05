@@ -25,7 +25,6 @@ gridsearch_dir = os.path.join(profiling_dir, "gridsearch")
 os.makedirs(gridsearch_dir, exist_ok=True)
 
 # Log file paths (all inside gridsearch_dir)
-memory_log_file = os.path.join(gridsearch_dir, "memory_peak_profile.csv")
 grid_search_log = os.path.join(gridsearch_dir, "grid_search_results.csv")
 early_stop_log_file = os.path.join(gridsearch_dir, "early_stop_epochs.csv")
 train_loss_log_file = os.path.join(gridsearch_dir, "training_loss_log.csv")
@@ -36,8 +35,8 @@ from models.model_att import GNN_node
 
 ### Configuration and Hyperparameters ###
 test = False  # if only testing but not training
-restart = True  # if restarting training (load saved model)
-reload_dataset = True  # if reloading an already processed dataset
+restart = False  # if restarting training (load saved model)
+reload_dataset = False  # if reloading an already processed dataset
 
 model_type = "dehnn"  # choices: ["dehnn", "dehnn_att", "digcn", "digat"]
 num_layer_choices = [2, 3, 4]
@@ -87,7 +86,6 @@ def setup_logging():
                     "num_dim",
                     "train_time_sec",
                     "gpu_peak_mb",
-                    "best_train_loss",
                     "val_node_mse",
                     "val_net_mse",
                 ]
@@ -95,9 +93,6 @@ def setup_logging():
     if not os.path.exists(train_loss_log_file):
         with open(train_loss_log_file, mode="w", newline="") as file:
             csv.writer(file).writerow(["num_layer", "num_dim", "epoch", "train_loss"])
-    if not os.path.exists(memory_log_file):
-        with open(memory_log_file, mode="w", newline="") as file:
-            csv.writer(file).writerow(["epoch", "gpu_peak_mb"])
     if not os.path.exists(early_stop_log_file):
         with open(early_stop_log_file, mode="w", newline="") as file:
             csv.writer(file).writerow(["num_layer", "num_dim", "early_stop_epoch"])
@@ -159,15 +154,10 @@ def load_data():
                 ],
                 dim=1,
             )
-            node_demand = (data.node_demand - torch.mean(data.node_demand)) / torch.std(
-                data.node_demand
-            )
-            net_demand = (data.net_demand - torch.mean(data.net_demand)) / torch.std(
-                data.net_demand
-            )
-            net_hpwl = (data.net_hpwl - torch.mean(data.net_hpwl)) / torch.std(
-                data.net_hpwl
-            )
+            node_demand = data.node_demand
+            net_demand = data.net_demand
+            net_hpwl = data.net_hpwl
+
             variant_data = (
                 node_demand,
                 net_hpwl,
