@@ -1,2 +1,0 @@
-num_layer,num_dim,vn,learning_rate,num_epochs
-3,16,True,0.001,50

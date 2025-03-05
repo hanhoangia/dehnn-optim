@@ -1,2 +1,0 @@
-Average test MSE for node demand regression: 117.6461181640625
-Average test MSE for net demand regression: 68.1499252319336
