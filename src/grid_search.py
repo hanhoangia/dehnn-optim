@@ -27,7 +27,7 @@ data_file = os.path.join(data_directory, "h_dataset.pt")
 profiling_dir = os.path.join(parent_directory, "..", "profiling_results")
 
 # All grid search logs will be stored in a folder named "gridsearch"
-gridsearch_dir = os.path.join(profiling_dir, "gridsearch")
+gridsearch_dir = os.path.join(profiling_dir, "grid-search")
 os.makedirs(gridsearch_dir, exist_ok=True)
 
 # Define full paths for various CSV log files within the gridsearch directory

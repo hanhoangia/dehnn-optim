@@ -31,20 +31,32 @@ from pyg_dataset import NetlistDataset
 from models.model_att import GNN_node
 
 model_type = "dehnn" #this can be one of ["dehnn", "dehnn_att", "digcn", "digat"] "dehnn_att" might need large memory usage
-num_layer = 2 #large number will cause OOM
-num_dim = 16 #large number will cause OOM
+num_layer = 4 #large number will cause OOM
+num_dim = 8 #large number will cause OOM
 vn = True #use virtual node or not
 trans = False #use transformer or not
 aggr = "add" #use aggregation as one of ["add", "max"]
 device = "cuda" #use cuda or cpu
 learning_rate = 0.001 # default: 0.001
+PATIENCE = 5
+TOLERANCE = 0.1
+MIN_EPOCHS = 10
+early_stop = True
+dlr = True # dynamic learning rate
+use_manual_seed = True
+manual_seed = 42
 
 parent_directory = os.path.dirname(os.path.abspath(__file__))  # Parent directory of the current script
 data_directory = os.path.join(parent_directory, '..', 'data')
 data_file_path = os.path.join(data_directory, 'h_dataset.pt')
 model_directory = os.path.join(parent_directory, '..', 'models/trained_models')
-model_file_path = os.path.join(model_directory, f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt")
-result_directory = os.path.join(parent_directory, '..', 'profiling_results')
+model_file_name = f"{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt"
+custom_model_file_name = ""
+if custom_model_file_name == "":
+    model_file_path = os.path.join(model_directory, model_file_name)
+else:
+    model_file_path = os.path.join(model_directory, custom_model_file_name)
+result_directory = os.path.join(parent_directory, '..', 'profiling_results/cross-val')
 current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 out_directory = os.path.join(result_directory, current_datetime)  # Result Metrics subdirectory name based on the current date and time
 # Create the subdirectory if it doesn't exist 
@@ -63,27 +75,25 @@ criterion_node = nn.MSELoss()
 criterion_net = nn.MSELoss()
 load_data_indices = [idx for idx in range(len(h_dataset))]
 all_indices = load_data_indices[:6]
-num_epochs = 50
+num_epochs = 30
 test_losses = []
 
-def early_stopping_condition(val_loss_history, k=10, tol=0.01):
+def early_stopping_condition(
+    val_loss_history, patience=PATIENCE, tol=TOLERANCE, min_epochs=MIN_EPOCHS
+):
     """
-    Function to check if the early stopping condition is met
-    :param val_loss_history: List of validation losses
-    :param patience: Number of epochs to wait before stopping
-    :param tol: Tolerance value for improvement in validation loss
-    :return: Boolean value indicating whether to stop training or not
+    Check if the early stopping condition is met.
+    Only check if at least min_epochs have passed.
+    It computes the average validation loss for the last 'patience' epochs and
+    stops if the relative improvement (difference between the first and last epoch in this window)
+    is less than tol times the first epoch's loss.
     """
-    if len(val_loss_history) >= k:
-        # Compute the average loss between node and net for each epoch
-        avg_k_losses = [(loss[0] + loss[1]) / 2 for loss in val_loss_history[-k:]]
-        # Check if the last k validation losses are still within the tolerance range
-        stop_lower_bound = (1 - tol) * avg_k_losses[0]
-        stop_upper_bound = (1 + tol) * avg_k_losses[0]
-        stop = all([stop_lower_bound <= loss <= stop_upper_bound for loss in avg_k_losses])
-        stop_range = (stop_lower_bound, stop_upper_bound)
-        if stop:
-            return stop_range
+    if len(val_loss_history) < min_epochs:
+        return False
+    recent_losses = [(loss[0] + loss[1]) / 2 for loss in val_loss_history[-patience:]]
+    improvement = recent_losses[0] - recent_losses[-1]
+    if improvement < tol * recent_losses[0]:
+        return True
     return False
 
 # Cross-validation
@@ -92,9 +102,12 @@ for fold in range(6):
     train_indices = [idx for idx in all_indices if idx % 6 != fold]
     valid_indices = [idx for idx in all_indices if idx % 6 == fold]
     test_indices = [idx for idx in all_indices if idx % 6 == fold]
+    if use_manual_seed:
+        torch.manual_seed(manual_seed)
     model = GNN_node(num_layer, num_dim, 1, 1, node_dim = h_data['node'].x.shape[1], net_dim = h_data['net'].x.shape[1], gnn_type=model_type, vn=vn, trans=trans, aggr=aggr, JK="Normal").to(device)
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate,  weight_decay=0.01)
-    scheduler = CyclicLR(optimizer, base_lr=0.001, max_lr=0.01, cycle_momentum=False, step_size_up=10, step_size_down=10, mode="triangular")
+    if dlr:
+        scheduler = CyclicLR(optimizer, base_lr=0.001, max_lr=0.01, cycle_momentum=False, step_size_up=10, step_size_down=10, mode="triangular")
     best_total_val = None
     train_losses = []
     val_losses = []
@@ -124,7 +137,8 @@ for fold in range(6):
                 loss = loss_node + loss_net
                 loss.backward()
                 optimizer.step()
-                scheduler.step()
+                if dlr:
+                    scheduler.step()
 
                 loss_node_all += loss_node.item()
                 loss_net_all += loss_net.item()
@@ -158,17 +172,14 @@ for fold in range(6):
             torch.save(model, model_file_path)
 
         # stop the training when the early stopping condition is met
-        patience = 10
-        tol = 0.1
         stop_epoch = None
-        stop_range = None
-        #if the early stopping condition function does not return False, it means the condition is met
-        stop_result = early_stopping_condition(val_losses, patience, tol)
-        if stop_result is not False:
-            print("Early stopping condition met at epoch: ", epoch)
-            stop_epoch = epoch
-            stop_range = stop_result
-            break
+
+        if early_stop:
+            #if the early stopping condition function does not return False, it means the condition is met
+            if early_stopping_condition(val_losses, patience=PATIENCE, tol=TOLERANCE, min_epochs=MIN_EPOCHS):
+                print("Early stopping condition met at epoch: ", epoch)
+                stop_epoch = epoch
+                break
     
 
     all_test_idx = 0
