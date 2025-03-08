@@ -59,7 +59,7 @@ manual_seed = 42
 #### Early Stopping configuration ####
 PATIENCE = 5
 TOLERANCE = 0.1
-MIN_EPOCHS = 10
+MIN_EPOCHS = 5
 ##### Additional configurations for debugging ####
 plot_grads = False
 
