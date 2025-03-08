@@ -2,7 +2,7 @@
 
 ## Table of Contents
 - [Introduction](#introduction)
-- [Background](#background)
+- [Project Overview](#project-overview)
 - [Environment Setup](#environment-setup)
   - [Step 1: Clone the repository](#step-1-clone-the-repository)
   - [Step 2: Download the Data](#step-2-download-the-data)
@@ -13,8 +13,8 @@
     - [Step 3.4: Install Pytorch](#step-34-install-pytorch)
     - [Step 3.5: Install CUDA-related packages (If Used with CUDA)](#step-35-install-cuda-related-packages-if-used-with-cuda)
 - [Profiling Instructions](#profiling-instructions)
-  - [Step 1: Configure the Model](#configure-the-model)
-  - [Step 2: Run the Experiment](#run-the-experiment)
+  - [Step 1: Configure the Model](#step-1-configure-the-model)
+  - [Step 2: Run the Experiment](#step-2-run-the-experiment)
 
 - [Repo Structure](#repo-structure)
 
@@ -180,7 +180,7 @@ python all_train_cross.py
   - `layers/`:  Contains the source code for the layers of the model.
   - `trained_models/`: Contains the pre-trained model files.
 - `notebooks/`: Contains the visualization notebooks for the profiling results.
-- `profiling_results/`: Contains the profiling results of our experiments. Also contains our model debugging results.
+- `profiling_results/`: Contains the profiling results of our experiments, and our model debugging results.
   - `baseline`: Contains the profiling results for the baseline model.
   - `iterative-optimization`: Contains `README_MODEL.md` that describes our *iterative optimization process* and the models produced in that process. Contains the profiling results for these models.
   - `grid-search`: Contains the profiling results for our Grid Search experiment.
