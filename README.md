@@ -182,7 +182,7 @@ python all_train_cross.py
 - `notebooks/`: Contains the visualization notebooks for the profiling results.
 - `profiling_results/`: Contains the profiling results of our experiments, and our model debugging results.
   - `baseline`: Contains the profiling results for the baseline model.
-  - `iterative-optimization`: Contains `README_MODEL.md` that describes our *iterative optimization process* and the models produced in that process. Contains the profiling results for these models.
+  - `iterative-optimization`: Contains `README_MODEL.md` that describes our *iterative optimization process* and the models produced in that process. Contains the profiling results for these models and a result summary in `iterative-optimization-results.png`.
   - `grid-search`: Contains the profiling results for our Grid Search experiment.
   - `cross-val`: Contains the profiling results for our Cross Validation run on our *optimized* model.
   - `gradient-norm-analysis`: Contains the gradient norm debugging results as part of our attempt to debug DE-HNN after a concern of overfitting.
