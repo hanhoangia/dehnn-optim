@@ -39,23 +39,28 @@ reload_dataset = True # if reload already processed h_dataset
 if test:
     restart = True
 
-model_type = "dehnn" #this can be one of ["dehnn", "dehnn_att", "digcn", "digat"] "dehnn_att" might need large memory usage
-num_layer = 4 #large number will cause OOM
-num_dim = 8 #large number will cause OOM
+#### DO NOT MODIFY ####
+model_type = "dehnn"
 vn = True #use virtual node or not
 trans = False #use transformer or not
 aggr = "add" #use aggregation as one of ["add", "max"]
-device = "cuda" #use cuda or cpu
+#######################
+
+
+#### Model configuration ####
+num_layer = 4 # baseline: 4; large number will cause OOM
+num_dim = 8 # baseline: 32; large number will cause OOM
+device = "cuda" # use cuda or cpu
 learning_rate = 0.001 # default: 0.001
+early_stop = True # use early stopping or not
+dlr = True # use dynamic learning rate (cyclic learning rate) or not
+use_manual_seed = True # use manual seed or not
+manual_seed = 42
+#### Early Stopping configuration ####
 PATIENCE = 5
 TOLERANCE = 0.1
 MIN_EPOCHS = 10
-early_stop = True
-dlr = True # dynamic learning rate
-use_manual_seed = True
-manual_seed = 42
-
-# Additional configuration for debugging
+##### Additional configurations for debugging ####
 plot_grads = False
 
 def early_stopping_condition(
@@ -76,6 +81,8 @@ def early_stopping_condition(
         return True
     return False
 
+
+#### Set paths ####
 parent_directory = os.path.dirname(os.path.abspath(__file__))  # Parent directory of the current script
 data_directory = os.path.join(parent_directory, '..', 'data')
 data_file_path = os.path.join(data_directory, 'h_dataset.pt')
@@ -92,6 +99,10 @@ out_directory = os.path.join(result_directory, current_datetime)  # Result Metri
 # Create the subdirectory if it doesn't exist 
 if not os.path.exists(out_directory):
     os.makedirs(out_directory)
+
+# Set manual seed for reproducibility
+if use_manual_seed:
+    torch.manual_seed(manual_seed)
 
 if not reload_dataset:
     dataset = NetlistDataset(data_dir="../data/superblue", load_pe = True, pl = True, processed = True, load_indices=None)
@@ -154,8 +165,6 @@ h_data = h_dataset[0]
 if restart:
     model = torch.load(model_file_path)
 else:
-    if use_manual_seed:
-        torch.manual_seed(manual_seed)
     model = GNN_node(num_layer, num_dim, 1, 1, node_dim = h_data['node'].x.shape[1], net_dim = h_data['net'].x.shape[1], gnn_type=model_type, vn=vn, trans=trans, aggr=aggr, JK="Normal").to(device)
 
 criterion_node = nn.MSELoss()

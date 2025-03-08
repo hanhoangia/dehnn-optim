@@ -12,24 +12,27 @@
     - [Step 3.3: Install and Activate Dedicated Python Kernel](#step-33-install-and-activate-dedicated-python-kernel)
     - [Step 3.4: Install Pytorch](#step-34-install-pytorch)
     - [Step 3.5: Install CUDA-related packages (If Used with CUDA)](#step-35-install-cuda-related-packages-if-used-with-cuda)
-- [Running the Experiment](#running-the-experiment)
+- [Profiling Instructions](#profiling-instructions)
+  - [Step 1: Configure the Model](#configure-the-model)
+  - [Step 2: Run the Experiment](#run-the-experiment)
+
 - [Repo Structure](#repo-structure)
 
 ---
 
 ## Introduction
 
-The DE-HNN model is a state-of-the-art (SOTA) graph neural network model to predict congestion using circuit netlist representation, outperforming other hypergraph and netlist models in both node-based and net-based demand regression tasks. However, its high computational demands pose a significant barrier to practical deployment, limiting scalability and efficiency. To address this challenge, our research focuses on exploring strategies to optimize the training cost of DE-HNN, in terms of memory usage or training runtime while preserving prediction quality. We systematically tune hyperparameters and profile metrics to analyze the trade-offs between computational cost and accuracy, aiming to identify the optimal balance between efficiency and performance across various model configurations.
+In chip design, traditional place-and-route (PnR) methods are beset by inefficiencies, as their iterative refinement of layouts can be both time-consuming and labor-intensive. By contrast, data-driven chip design optimization offers a more efficient alternative, leveraging machine learning to predict resource bottlenecks early on and inform design decisions that minimize costly design iterations. Central to this approach is the netlist, a hypergraph representation of a circuit's connectivity, where nodes represent components (e.g., logic gates) and hyperedges represent electrical connections. By analyzing and optimizing resource demand through the netlist, this method directly enhances floorplanning—the process of arranging components on a 2D chip canvas—by providing insights that minimize congestion while optimizing Power, Performance, and Area (PPA) and meeting design constraints.
+
+DE-HNN is a state-of-the-art hypergraph neural network designed to predict congestion in chip design via demand regression. It outperforms other models by effectively capturing long-range dependencies through hierarchical virtual nodes, which aggregate node features within partitioned graph neighborhoods and propagate information efficiently, enabling more robust predictions.
+
+While DEHNN delivers high performance, its scalability and practicality are limited by its significant computational overhead and lengthy runtimes.
 
 ---
 
-## Background
+## Project Overview
 
-The DE-HNN model is a type of Graph Neural Network (GNN) designed for congestion modeling in chip design by leveraging hypergraph structures and virtual nodes to capture long-range dependencies in dense circuits. Although it demonstrates strong predictive performance, DE-HNN is computationally expensive due to its dual update mechanism for nodes and nets, as well as the construction of virtual nodes that facilitate message passing. These factors lead to high memory consumption and extended training times, limiting the model’s scalability to larger and more complex circuit netlists. Given the increasing complexity of modern chip designs, reducing the computational cost of DE-HNN without significantly degrading predictive performance is essential for its practical deployment.
-
-DE-HNN addresses these challenges by introducing a directed hypergraph representation of netlists, which preserves the hierarchical structure of circuit elements and differentiates between driver and sink nodes. It enhances message-passing effectiveness by incorporating hierarchical virtual nodes (VNs) and persistence-based topological summaries, enabling better scalability for large-scale designs. The model has demonstrated SOTA performance in predicting wirelength and congestion from netlist inputs, outperforming other SOTA machine learning models for hypergraphs and netlists such as NetlistGNN.
-
-Unlike efforts that emphasize accuracy improvements, our research focuses on the investigation of cost-optimizing strategies for DE-HNN through hyperparameter tuning and model architecture adjustments. Specifically, we employ metric profiling to identify key computational bottlenecks in terms of both runtime and memory usage for DE-HNN. Our hypothesis is that reducing the number of layers in the model, thereby shortening the propagation interval, will lead to significant reductions in both memory requirements and runtime. This is because we suspect that neural message-passing between nets and nodes drives the majority of the model's computational cost, and by targeting this bottleneck, we can explore the trade-off between DE-HNN training cost and its performance.
+The high computational cost of DE-HNN has motivated our project to explore cost-effective ways of optimizing the model while preserving the model performance.
 
 ---
 
@@ -46,36 +49,30 @@ cd dehnn-optim
 
 ### Step 2: Download the Data
 
-You can download the initial processed dataset [here](https://zenodo.org/records/14599896/files/superblue.zip?download=1), unzip to `data/` and run the following commands to get the data ready for training:
-
-```bash
-cd data
-python run_all_data.py
-```
-
+Download the fully processed dataset [here](https://drive.google.com/file/d/1ir2ZeRgKJkfl9W6mK-xwug0y_-Kc3S21/view?usp=sharing) and move it to `/data`.
 
 ### Step 3: Setup Development Environment
 
 **Note**: This project is developed and run in a Conda environment. Please follow the instructions below to setup the environment.
 
-#### Step 3.1 Install Miniconda (If Uninstalled)
+#### Step 3.1: Install Miniconda (If Uninstalled)
 
 Follow the instructions [here](https://docs.anaconda.com/miniconda/install/) based on the specs of your machine.
 
-#### Step 3.2 Create and Activate Conda Environment
+#### Step 3.2: Create and Activate Conda Environment
 
 ```bash
 conda install --name "B12-3" --file requirements.txt
 conda activate B12-3
 ```
 
-### Step 3.3 Install and Activate a Dedicated Python Kernel
+### Step 3.3: Install and Activate a Dedicated Python Kernel
 
 ```bash
 conda install -c conda-forge nb_conda_kernels
 ```
 
-### Step 3.4 Install  Torch
+### Step 3.4: Install  Torch
 
 - For CPU only:
 
@@ -101,7 +98,7 @@ pip install torch==2.2.2+cu121 torchvision==0.17.2+cu121 torchaudio==2.2.2 --ext
 
 **Note**: 
 
-### Step 3.5 Install  CUDA-related packages (If  Used with CUDA)
+### Step 3.5: Install  CUDA-related packages (If  Used with CUDA)
 
 You can install from `cuda_related_packages.txt` by entering the following command but it will take a lot of time because Pip will build many of the installers from source:
 
@@ -124,9 +121,42 @@ Instead, do the following:
 
 ---
 
-## Running the Experiment
+## Profiling Instructions
 
-There are 2 main source code files to run the experiment, `all_train_cross.py` for single model training and performance, and `grid_search.py` for profiling results with different model configurations using Grid Search.
+### Step 1:  Configure the Model
+
+There are 10 hyperparameters you can set to configure the model:
+
+| Hyperparameter  | Description                                                  | Default |
+| --------------- | ------------------------------------------------------------ | ------- |
+| num_layer       | the number of layers in the model                            | 4       |
+| num_dim         | the number of dimensions in the model                        | 8       |
+| learning_rate   | the learning rate of the model                               | 0.001   |
+| early_stop      | use the Early Stopping condition or not                      | True    |
+| MIN_EPOCHS      | the minimum number of epochs to run before Early Stopping condition can be triggered | 5       |
+| PATIENCE        | the number of prior epochs used to compute the average validation loss as the condition trigger | 5       |
+| TOLERANCE       | the allowed range around the average validation loss within which the loss must remain to continue training | 0.1     |
+| use_manual_seed | use a fixed random seed for weight initialization of the model | True    |
+| manual_seed     | the fixed seed number (if use_manual_seed = True)            | 42      |
+| device          | use CUDA or not                                              | cuda    |
+
+**Note**: The default is set to the settings of our optimized model. Refer to our report for our baseline settings and the settings of our other experiments. Feel free to play with the hyperparameters, but note that high `num_layer` and `num_dim` can cause out-of-memory (OOM) issue.
+
+### Step 2: Run the Experiment
+
+There are 3 ways to run the experiments: 
+
+1. `all_train_cross.py` for single model training and performance with a specified configuration. 
+
+   *The experiment results will be stored in the `profiling_results/[current date time of the run]` directory*, consisting of the training runtime, peak memory usage, model performance, and Early Stop epoch (if Early Stopping is enabled).
+
+2. `grid_search.py` for testing with different model configurations using Grid Search.
+
+   *The experiment results will be stored in the `profiling_results/grid-search` directory*. Run our `gridsearch_plots.ipynb` notebook to generate the visualization for the results.
+
+3. `cross-val.py` for doing 6-Fold cross-validation for a specified model configuration.
+
+   *The experiment results will be stored in the `profiling_results/cross-val\[current date time of the run]` directory*.
 
 - To train the model, run:
 
@@ -135,37 +165,26 @@ cd src
 python all_train_cross.py
 ```
 
-- To generate model performance after training, open `src/all_train_cross.py` and change the `test` parameter from `False` to `True` and rerun the `all_train_cross.py` file.
+- To get model performance on the test set, open `src/all_train_cross.py` and change the `test` parameter from `False` to `True` and rerun the `all_train_cross.py` file.
 
-**Note**: To modify the model parameters, open `src/all_train_cross.py` and modify `num_layers`/`num_dim` to your needs.
-
-- To generate profiling results using grid-search:
-
-```bash
-cd src
-python grid_search.py
-```
-
-**Note**: To modify the parameter grid of grid-search, open `src/grid_search.py` and modify `num_layer_choices` and `num_dim_choices` to your needs.
-
-**Note**: There are pre-trained models available for use. The pre-trained model files are saved in `models/trained_models` in the following format: `{model_type}_{num_layer}_{num_dim}_{vn}_{trans}_model.pt`. To use a pre-trained model, first make sure the parameters of the model that will be used to run the experiment in the source code file matches with an available model that is in accordance to your parameter preferences, then change the `test` parameter in the source code file from `False` to `True`.
-
-*The experiment results will be stored in the `profiling_results` directory*.
+**Note**: There are pre-trained model files available in `models/trained_models` for the models that were generated through our *iterative optimization* process . To use a pre-trained model, simply update the `custom_model_file_path` variable in the source code file to match the name of the pre-trained model file.
 
 ## Repo Structure
 
 - `README.md`: Includes an overview and reproducing instructions for the project.
 - `cuda_related_packages.txt`: List of CUDA-related libraries required for the project if run on CUDA.
 - `requirements.txt`: List of Python dependencies required for the project.
-- `data`: Contains the dataset description file (i.e. `README_DATA.md`), the source code files to process the data, and the data files themselves.
+- `data`: Contains the dataset description file (i.e. `README_DATA.md`), and the downloaded dataset file.
 - `models/`
   - `encoders/`: Contains the source code for the encoders of the model.
   - `layers/`:  Contains the source code for the layers of the model.
   - `trained_models/`: Contains the pre-trained model files.
-- `notebooks/`: Contains data exploration plots and analysis for the profiling results.
-- `profiling_results/`: Contains the profiling results of the experiments, for both runtime profiling and memory profiling.
-  - `runtime`: Contains the runtime profiling results.
-  - `memory`: Contains the memory profiling results.
-  - `grid-search`: Contains grid-search profiling results.
-- `src/`: Contains the model training and evaluation source code, as well as the associated utility file.
+- `notebooks/`: Contains the visualization notebooks for the profiling results.
+- `profiling_results/`: Contains the profiling results of our experiments. Also contains our model debugging results.
+  - `baseline`: Contains the profiling results for the baseline model.
+  - `iterative-optimization`: Contains `README_MODEL.md` that describes our *iterative optimization process* and the models produced in that process. Contains the profiling results for these models.
+  - `grid-search`: Contains the profiling results for our Grid Search experiment.
+  - `cross-val`: Contains the profiling results for our Cross Validation run on our *optimized* model.
+  - `gradient-norm-analysis`: Contains the gradient norm debugging results as part of our attempt to debug DE-HNN after a concern of overfitting.
+- `src/`: Contains the source code files for the experiments.
 - `.gitignore`:  Specify which files or directories Git should *ignore* when tracking changes in a repository.

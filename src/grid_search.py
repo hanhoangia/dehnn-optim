@@ -56,6 +56,8 @@ trans = False  # Do not use transformer in this case
 aggr = "add"  # Aggregation function: "add" (or "max")
 device = "cuda"  # Use GPU if available, else "cpu"
 learning_rate = 0.001  # Optimizer learning rate
+use_manual_seed = True  # use manual seed or not
+manual_seed = 42  # manual seed value
 
 # Data splitting (to match baseline experiments)
 # Training: indices 2 to 6; Validation (and testing): indices starting at 11
@@ -66,6 +68,11 @@ TRAIN_SAMPLES = 7
 PATIENCE = 5  # Number of epochs in the window to check for improvement
 TOLERANCE = 0.1  # Require a 10% relative improvement
 MIN_EPOCHS = 10  # Do not check early stopping until at least 10 epochs
+
+# Set manual seed for reproducibility
+if use_manual_seed:
+    torch.manual_seed(manual_seed)
+
 
 
 # ----------------------------------
