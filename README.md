@@ -3,6 +3,7 @@
 ## Table of Contents
 - [Introduction](#introduction)
 - [Project Overview](#project-overview)
+- [Quick Links](#quick-links)
 - [Environment Setup](#environment-setup)
   - [Step 1: Clone the repository](#step-1-clone-the-repository)
   - [Step 2: Download the Data](#step-2-download-the-data)
@@ -33,6 +34,15 @@ While DEHNN delivers high performance, its scalability and practicality are limi
 ## Project Overview
 
 The high computational cost of DE-HNN has motivated our project to explore cost-effective ways of optimizing the model while preserving the model performance.
+
+---
+
+## Quick Links
+
+- [Project Poster](https://drive.google.com/file/d/10gviqJFT70HnTlcW_YNluuJ6lfLLHyci/view?usp=sharing)
+- [Project Website](https://okinahiru.github.io/website/)
+- [Project Report](https://github.com/hanhoangia/180b_b12-3_artifact/blob/main/report.pdf)
+- [DE-HNN Original Paper](https://arxiv.org/abs/2404.00477)
 
 ---
 
@@ -167,7 +177,9 @@ python all_train_cross.py
 
 - To get model performance on the test set, open `src/all_train_cross.py` and change the `test` parameter from `False` to `True` and rerun the `all_train_cross.py` file.
 
-**Note**: There are pre-trained model files available in `models/trained_models` for the models that were generated through our *iterative optimization* process . To use a pre-trained model, simply update the `custom_model_file_path` variable in the source code file to match the name of the pre-trained model file.
+**Note**: There are pre-trained model files available in `models/trained_models` for the models that were generated through our *iterative optimization* process (see [`README_MODEL.md`](https://github.com/hanhoangia/dehnn-optim/blob/main/profiling_results/iterative-optimization/README_MODEL.md)). To use a pre-trained model, simply update the `custom_model_file_path` variable in the source code file to match the name of the pre-trained model file.
+
+---
 
 ## Repo Structure
 
