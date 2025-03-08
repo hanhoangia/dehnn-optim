@@ -66,13 +66,13 @@ conda install --name "B12-3" --file requirements.txt
 conda activate B12-3
 ```
 
-### Step 3.3: Install and Activate a Dedicated Python Kernel
+### Step 3.3: Install and Activate Dedicated Python Kernel
 
 ```bash
 conda install -c conda-forge nb_conda_kernels
 ```
 
-### Step 3.4: Install  Torch
+### Step 3.4: Install PyTorch
 
 - For CPU only:
 
@@ -98,7 +98,7 @@ pip install torch==2.2.2+cu121 torchvision==0.17.2+cu121 torchaudio==2.2.2 --ext
 
 **Note**: 
 
-### Step 3.5: Install  CUDA-related packages (If  Used with CUDA)
+### Step 3.5: Install CUDA-related packages (If Used with CUDA)
 
 You can install from `cuda_related_packages.txt` by entering the following command but it will take a lot of time because Pip will build many of the installers from source:
 
@@ -123,7 +123,7 @@ Instead, do the following:
 
 ## Profiling Instructions
 
-### Step 1:  Configure the Model
+### Step 1: Configure the Model
 
 There are 10 hyperparameters you can set to configure the model:
 
@@ -137,8 +137,8 @@ There are 10 hyperparameters you can set to configure the model:
 | PATIENCE        | the number of prior epochs used to compute the average validation loss as the condition trigger | 5       |
 | TOLERANCE       | the allowed range around the average validation loss within which the loss must remain to continue training | 0.1     |
 | use_manual_seed | use a fixed random seed for weight initialization of the model | True    |
-| manual_seed     | the fixed seed number (if use_manual_seed = True)            | 42      |
-| device          | use CUDA or not                                              | cuda    |
+| manual_seed     | the fixed seed number (if `use_manual_seed` = True)          | 42      |
+| device          | `cuda` if runs with CUDA, `cpu` otherwise                    | cuda    |
 
 **Note**: The default is set to the settings of our optimized model. Refer to our report for our baseline settings and the settings of our other experiments. Feel free to play with the hyperparameters, but note that high `num_layer` and `num_dim` can cause out-of-memory (OOM) issue.
 
