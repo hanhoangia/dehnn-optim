@@ -27,13 +27,13 @@ In chip design, traditional place-and-route (PnR) methods are beset by inefficie
 
 DE-HNN is a state-of-the-art hypergraph neural network designed to predict congestion in chip design via demand regression. It outperforms other models by effectively capturing long-range dependencies through hierarchical virtual nodes, which aggregate node features within partitioned graph neighborhoods and propagate information efficiently, enabling more robust predictions.
 
-While DEHNN delivers high performance, its scalability and practicality are limited by its significant computational overhead and lengthy runtimes.
+While DE-HNN delivers high performance, its scalability and practicality are limited by its significant computational overhead and lengthy runtimes.
 
 ---
 
 ## Project Overview
 
-The high computational cost of DE-HNN has motivated our project to explore cost-effective ways of optimizing the model while preserving the model performance.
+The high computational cost of DE-HNN motivates our research to focus on exploring strategies to optimize the training cost of DE-HNN, in terms of memory usage or training runtime while preserving prediction quality.
 
 ---
 
